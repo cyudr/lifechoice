@@ -93,6 +93,15 @@ function getCartoonHeartbeatScale(): number {
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<GameType>('dashboard');
+  const [clickedIconId, setClickedIconId] = useState<string | null>(null);
+
+  const triggerHeartbeat = (id: string) => {
+    setClickedIconId(id);
+    setTimeout(() => {
+      setClickedIconId(prev => prev === id ? null : prev);
+    }, 750);
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [history, setHistory] = useState<DecisionHistoryEntry[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -746,47 +755,71 @@ export default function App() {
         {/* Responsive Desktop nav options - Icons + One-word text only */}
         <nav className="hidden md:flex items-center gap-2">
           <button
-            onClick={() => setActiveScreen('dashboard')}
+            onClick={() => { setActiveScreen('dashboard'); triggerHeartbeat('playground'); }}
             className={`flex items-center gap-1 font-sans font-extrabold text-xs py-1.5 px-3 rounded-xl transition-all ${
               activeScreen === 'dashboard' 
                 ? 'bg-primary-container/10 text-primary' 
                 : 'text-outline hover:text-on-surface'
             }`}
           >
-            <Compass className="w-3.5 h-3.5" />
+            <Compass className={`w-3.5 h-3.5 ${
+              clickedIconId === 'playground' 
+                ? 'animate-click-heartbeat' 
+                : activeScreen === 'dashboard' 
+                  ? 'animate-heartbeat text-secondary-container' 
+                  : ''
+            }`} />
             <span>Playground</span>
           </button>
           <button
-            onClick={() => setActiveScreen('tribe')}
+            onClick={() => { setActiveScreen('tribe'); triggerHeartbeat('tribe'); }}
             className={`flex items-center gap-1 font-sans font-extrabold text-xs py-1.5 px-3 rounded-xl transition-all ${
               activeScreen === 'tribe' 
                 ? 'bg-primary-container/10 text-primary' 
                 : 'text-outline hover:text-on-surface'
             }`}
           >
-            <Users className="w-3.5 h-3.5" />
+            <Users className={`w-3.5 h-3.5 ${
+              clickedIconId === 'tribe' 
+                ? 'animate-click-heartbeat' 
+                : activeScreen === 'tribe' 
+                  ? 'animate-heartbeat text-secondary-container' 
+                  : ''
+            }`} />
             <span>Tribe</span>
           </button>
           <button
-            onClick={() => setActiveScreen('history')}
+            onClick={() => { setActiveScreen('history'); triggerHeartbeat('history'); }}
             className={`flex items-center gap-1 font-sans font-extrabold text-xs py-1.5 px-3 rounded-xl transition-all ${
               activeScreen === 'history' 
                 ? 'bg-primary-container/10 text-primary' 
                 : 'text-outline hover:text-on-surface'
             }`}
           >
-            <History className="w-3.5 h-3.5" />
+            <History className={`w-3.5 h-3.5 ${
+              clickedIconId === 'history' 
+                ? 'animate-click-heartbeat' 
+                : activeScreen === 'history' 
+                  ? 'animate-heartbeat text-secondary-container' 
+                  : ''
+            }`} />
             <span>History</span>
           </button>
           <button
-            onClick={() => setActiveScreen('profile')}
+            onClick={() => { setActiveScreen('profile'); triggerHeartbeat('profile'); }}
             className={`flex items-center gap-1 font-sans font-extrabold text-xs py-1.5 px-3 rounded-xl transition-all ${
               activeScreen === 'profile' 
                 ? 'bg-primary-container/10 text-primary' 
                 : 'text-outline hover:text-on-surface'
             }`}
           >
-            <User className="w-3.5 h-3.5" />
+            <User className={`w-3.5 h-3.5 ${
+              clickedIconId === 'profile' 
+                ? 'animate-click-heartbeat' 
+                : activeScreen === 'profile' 
+                  ? 'animate-heartbeat text-secondary-container' 
+                  : ''
+            }`} />
             <span>Profile</span>
           </button>
         </nav>
@@ -961,7 +994,7 @@ export default function App() {
                     {filteredGrid.map((card, index) => (
                       <div
                         key={card.id}
-                        onClick={() => setActiveScreen(card.id as any)}
+                        onClick={() => { setActiveScreen(card.id as any); triggerHeartbeat(card.id); }}
                         className="flex flex-col items-center justify-center group cursor-pointer text-center"
                         title={card.desc}
                       >
@@ -971,6 +1004,7 @@ export default function App() {
                           <div
                             id={`dashboard-card-${card.id}`}
                             className={`w-16 h-16 rounded-full bg-surface-container-low border-2 flex items-center justify-center text-3xl shadow-xs transition-all duration-300 relative z-10 
+                              ${clickedIconId === card.id ? 'animate-click-heartbeat' : ''}
                               ${poppedCards[card.id]
                                 ? 'scale-125 rotate-12 border-primary bg-[#e1e0ff] shadow-[0_0_20px_rgba(70,72,212,0.4)] ring-4 ring-[#4648d4]/10'
                                 : 'border-outline-variant/15 group-hover:scale-115 group-hover:rotate-12 group-hover:border-[#ff56a7]/40 group-hover:bg-[#eaedff] group-hover:shadow-[0_8px_20px_rgba(70,72,212,0.18)]'
@@ -1117,50 +1151,74 @@ export default function App() {
       {/* Persistent Bottom Nav Menu from JSON (Mobile viewports only) */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center py-2.5 px-2 bg-white/80 border-t border-outline-variant/20 z-50 backdrop-blur-md shadow-[0px_-4px_20px_rgba(15,23,42,0.04)]">
         <button
-          onClick={() => setActiveScreen('dashboard')}
+          onClick={() => { setActiveScreen('dashboard'); triggerHeartbeat('m_playground'); }}
           className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
             activeScreen === 'dashboard' || (activeScreen !== 'history' && activeScreen !== 'profile' && activeScreen !== 'tribe')
               ? 'bg-primary/10 text-primary'
               : 'text-outline hover:text-on-surface'
           }`}
         >
-          <Compass className="w-5 h-5" />
+          <Compass className={`w-5 h-5 ${
+            clickedIconId === 'm_playground'
+              ? 'animate-click-heartbeat'
+              : activeScreen === 'dashboard' || (activeScreen !== 'history' && activeScreen !== 'profile' && activeScreen !== 'tribe')
+                ? 'animate-heartbeat text-secondary-container'
+                : ''
+          }`} />
           <span className="font-sans font-bold text-[10px] mt-0.5">Home</span>
         </button>
 
         <button
-          onClick={() => setActiveScreen('tribe')}
+          onClick={() => { setActiveScreen('tribe'); triggerHeartbeat('m_tribe'); }}
           className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
             activeScreen === 'tribe'
               ? 'bg-primary/10 text-primary'
               : 'text-outline hover:text-on-surface'
           }`}
         >
-          <Users className="w-5 h-5" />
+          <Users className={`w-5 h-5 ${
+            clickedIconId === 'm_tribe'
+              ? 'animate-click-heartbeat'
+              : activeScreen === 'tribe'
+                ? 'animate-heartbeat text-secondary-container'
+                : ''
+          }`} />
           <span className="font-sans font-bold text-[10px] mt-0.5">Tribe</span>
         </button>
 
         <button
-          onClick={() => setActiveScreen('history')}
+          onClick={() => { setActiveScreen('history'); triggerHeartbeat('m_history'); }}
           className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
             activeScreen === 'history'
               ? 'bg-primary/10 text-primary'
               : 'text-outline hover:text-on-surface'
           }`}
         >
-          <History className="w-5 h-5" />
+          <History className={`w-5 h-5 ${
+            clickedIconId === 'm_history'
+              ? 'animate-click-heartbeat'
+              : activeScreen === 'history'
+                ? 'animate-heartbeat text-secondary-container'
+                : ''
+          }`} />
           <span className="font-sans font-bold text-[10px] mt-0.5">History</span>
         </button>
 
         <button
-          onClick={() => setActiveScreen('profile')}
+          onClick={() => { setActiveScreen('profile'); triggerHeartbeat('m_profile'); }}
           className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
             activeScreen === 'profile'
               ? 'bg-primary/10 text-primary'
               : 'text-outline hover:text-on-surface'
           }`}
         >
-          <User className="w-5 h-5" />
+          <User className={`w-5 h-5 ${
+            clickedIconId === 'm_profile'
+              ? 'animate-click-heartbeat'
+              : activeScreen === 'profile'
+                ? 'animate-heartbeat text-secondary-container'
+                : ''
+          }`} />
           <span className="font-sans font-bold text-[10px] mt-0.5">Profile</span>
         </button>
       </nav>

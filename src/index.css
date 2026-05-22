@@ -157,3 +157,31 @@
 .animate-scan-line {
   animation: scan-line 2s linear infinite;
 }
+
+/* Rhythmic Resting Heartbeat Loop (for Active icon states) */
+@keyframes heartbeat {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.1); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.1); }
+  70% { transform: scale(1); }
+}
+
+.animate-heartbeat {
+  animation: heartbeat 1.2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
+}
+
+/* Sudden tactile heartbeat punch on Touch or Selection of elements */
+@keyframes click-heartbeat {
+  0%, 100% { transform: scale(1); }
+  18% { transform: scale(1.22); }
+  36% { transform: scale(0.92); }
+  54% { transform: scale(1.14); }
+  72% { transform: scale(0.97); }
+  88% { transform: scale(1.03); }
+}
+
+.animate-click-heartbeat {
+  animation: click-heartbeat 0.75s ease-out;
+}
+
