@@ -28,7 +28,7 @@ export function AdSenseBanner({ walletProfile, onAddRevenue }: AdSenseBannerProp
       const script = doc.createElement('script');
       script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${pubId}`;
       script.async = true;
-      script.crossOrigin = 'anonymous';
+      script.setAttribute('crossorigin', 'anonymous');
       doc.head.appendChild(script);
     }
 
