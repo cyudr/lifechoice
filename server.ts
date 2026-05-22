@@ -33,8 +33,18 @@ function getAiClient(): GoogleGenAI | null {
 
 // Resilient verification endpoints for Google AdSense Crawler access
 app.get('/ads.txt', (req, res) => {
-  res.type('text/plain');
-  res.send('google.com, pub-8369709738621970, DIRECT, f08c47fec0942fa0');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('text/plain; charset=utf-8');
+  res.send('google.com, pub-8369709738621970, DIRECT, f08c47fec0942fa0\n');
+});
+
+// Explicit Robots-compliance endpoint for crawler accessibility
+app.get('/robots.txt', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('text/plain; charset=utf-8');
+  res.send('User-agent: *\nAllow: /\n\nUser-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: Googlebot\nAllow: /\n');
 });
 
 // REST API route for options generation (e.g. food, generic choices)
