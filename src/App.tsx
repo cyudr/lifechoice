@@ -99,13 +99,20 @@ export default function App() {
   };
 
   // Call server-side helper for Gemini smart message reply
-  const handleRequestTextHelp = async (scenario: string, tone: string): Promise<string[]> => {
+  const handleRequestTextHelp = async (
+    scenario: string,
+    situation: string,
+    tone: string,
+    style: string,
+    emoji: string,
+    length: string
+  ): Promise<string[]> => {
     setAiLoading(true);
     try {
       const res = await fetch('/api/gemini/texts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario, tone })
+        body: JSON.stringify({ scenario, situation, tone, style, emoji, length })
       });
       const data = await res.json();
       if (data && data.texts) {
@@ -119,6 +126,39 @@ export default function App() {
         "Really wish I could go but I have to catch up on sleep tonight. Let's hang soon!",
         "Low battery alert! Tucking myself in with hot herbal tea. Have massive fun! 🔋"
       ];
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Call server-side helper for Gemini biometric/aura vibe analysis
+  const handleRequestVibeAnalysis = async (customInput?: string): Promise<any> => {
+    setAiLoading(true);
+    try {
+      const res = await fetch('/api/gemini/vibe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customInput })
+      });
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      console.warn("API vibe analysis offline. Using local backup vibe profiles.");
+      return {
+        title: "You're channeling cozy vintage dreamland ☕",
+        subValue: "Soft, artistic, thoughtful, and slightly mysterious. You resemble a character from a French indie movie.",
+        metrics: [
+          { label: "Casual", percentage: 75, rating: 4 },
+          { label: "Trendy", percentage: 60, rating: 3 },
+          { label: "Elegant", percentage: 78, rating: 4 },
+          { label: "Bohemian", percentage: 92, rating: 5 }
+        ],
+        bubbles: [
+          { label: "Artistic", percentage: 92 },
+          { label: "Thoughtful", percentage: 87 },
+          { label: "Chill", percentage: 90 }
+        ]
+      };
     } finally {
       setAiLoading(false);
     }
@@ -331,7 +371,11 @@ export default function App() {
           )}
 
           {activeScreen === 'vibe' && (
-            <VibeCheckGame onSaveDecision={handleSaveDecision} />
+            <VibeCheckGame
+              onSaveDecision={handleSaveDecision}
+              onRequestVibe={handleRequestVibeAnalysis}
+              isAiLoading={aiLoading}
+            />
           )}
 
           {activeScreen === 'poll' && (

@@ -4,6 +4,8 @@ import { VibeResult, DecisionHistoryEntry } from '../types';
 
 interface VibeCheckGameProps {
   onSaveDecision: (entry: Omit<DecisionHistoryEntry, 'id' | 'timestamp'>) => void;
+  onRequestVibe?: (customInput?: string) => Promise<any>;
+  isAiLoading?: boolean;
 }
 
 const CONSTANT_VIBES: VibeResult[] = [
@@ -54,7 +56,7 @@ const CONSTANT_VIBES: VibeResult[] = [
   }
 ];
 
-export function VibeCheckGame({ onSaveDecision }: VibeCheckGameProps) {
+export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: VibeCheckGameProps) {
   const [step, setStep] = useState<'camera' | 'scanning' | 'result'>('camera');
   const [streamActive, setStreamActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -134,25 +136,62 @@ export function VibeCheckGame({ onSaveDecision }: VibeCheckGameProps) {
   useEffect(() => {
     if (step !== 'scanning') return;
     
+    let geminiResult: any = null;
+    let geminiError: any = null;
+    let requestFinished = false;
+
+    if (onRequestVibe) {
+      onRequestVibe()
+        .then((res) => {
+          geminiResult = res;
+          requestFinished = true;
+        })
+        .catch((err) => {
+          geminiError = err;
+          requestFinished = true;
+        });
+    } else {
+      requestFinished = true;
+    }
+
     const interval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 100) {
-          clearInterval(interval);
-          
-          // Pick a random vibe result
-          const randomIndex = Math.floor(Math.random() * CONSTANT_VIBES.length);
-          const pickedVibe = CONSTANT_VIBES[randomIndex];
-          setVibeResult(pickedVibe);
-          setStep('result');
+          if (requestFinished) {
+            clearInterval(interval);
+            
+            let pickedVibe: VibeResult;
+            if (geminiResult && !geminiError) {
+              const colorClasses = [
+                "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+                "bg-indigo-500/10 text-indigo-700 border-indigo-200",
+                "bg-rose-500/10 text-rose-700 border-rose-200"
+              ];
+              pickedVibe = {
+                ...geminiResult,
+                bubbles: (geminiResult.bubbles || []).map((b: any, index: number) => ({
+                  ...b,
+                  colorClass: colorClasses[index % colorClasses.length]
+                }))
+              };
+            } else {
+              const randomIndex = Math.floor(Math.random() * CONSTANT_VIBES.length);
+              pickedVibe = CONSTANT_VIBES[randomIndex];
+            }
 
-          onSaveDecision({
-            gameType: 'vibe',
-            title: 'Vibe Scanner',
-            result: pickedVibe.title,
-            options: pickedVibe.bubbles.map(b => `${b.label} (${b.percentage}%)`)
-          });
+            setVibeResult(pickedVibe);
+            setStep('result');
 
-          return 100;
+            onSaveDecision({
+              gameType: 'vibe',
+              title: 'Vibe Scanner',
+              result: pickedVibe.title,
+              options: pickedVibe.bubbles.map(b => `${b.label} (${b.percentage}%)`)
+            });
+
+            return 100;
+          }
+          return 99;
         }
         return prev + 8;
       });
@@ -265,8 +304,12 @@ export function VibeCheckGame({ onSaveDecision }: VibeCheckGameProps) {
             <div className="absolute left-0 w-full h-1 bg-[#ff56a7] animate-scan-line shadow-[0_0_10px_#ff56a7] top-0"></div>
           </div>
 
-          <h4 className="font-display font-bold text-sm text-on-surface">Decrypting Biometrics...</h4>
-          <p className="text-[11px] text-on-surface-variant font-sans mt-0.5">Staring into the neural vibe cluster of your choices.</p>
+          <h4 className="font-display font-bold text-sm text-on-surface">
+            {progress === 99 ? 'Aura Alignment...' : 'Decrypting Biometrics...'}
+          </h4>
+          <p className="text-[11px] text-on-surface-variant font-sans mt-0.5">
+            {progress === 99 ? 'Gemini AI is reading your aura signature...' : 'Staring into the neural vibe cluster of your choices.'}
+          </p>
 
           <div className="w-full bg-neutral-100 h-2 rounded-full mt-4 overflow-hidden">
             <div
