@@ -229,21 +229,21 @@ export function SpinWheelGame({ onSaveDecision, onRequestSuggestions, isAiLoadin
     setWeights([33, 33, 34]);
   };
 
-  // Helper colors for wheel rendering - vibrant premium energetic theme with high-contrast shapes
+  // Helper colors for wheel rendering - gorgeous soft pastel shades for handdrawn cartoon aesthetic
   const segmentColors = [
-    '#6366f1', // Cosmic Violet
-    '#ff56a7', // Neon Pink
-    '#10b981', // Emerald Spark
-    '#f59e0b', // Sunny Gold
-    '#3b82f6', // Electric Blue
-    '#f43f5e', // Vibrant Rose
-    '#06b6d4', // Bright Cyan
-    '#8b5cf6'  // Deep Purple
+    '#ffdfdf', // Pastel Rose
+    '#dfffd6', // Pastel Mint
+    '#ffeeb3', // Pastel Sunny Yellow
+    '#dfebff', // Pastel Sky Blue
+    '#f4dfff', // Pastel Lilac
+    '#ffdff4', // Pastel Pink Blossom
+    '#d6fff5', // Pastel Aquamarine
+    '#ffe6cc'  // Pastel Peach
   ];
 
   // Dynamic conic-gradient string
   const getConicGradient = () => {
-    if (options.length === 0) return 'conic-gradient(#1e1b4b 0 360deg)';
+    if (options.length === 0) return 'conic-gradient(#fdfbf7 0 360deg)';
     let accumulatedDegrees = 0;
     const slices = options.map((_, index) => {
       const startDeg = accumulatedDegrees;
@@ -342,43 +342,46 @@ export function SpinWheelGame({ onSaveDecision, onRequestSuggestions, isAiLoadin
         )}
       </div>
 
-      {/* Wheel Visual Section (10% increased dimensions and dark neon outer collar) */}
+      {/* Wheel Visual Section (Handdrawn & Cartoonized Board style) */}
       <div className="relative flex flex-col items-center justify-center mb-6">
         
-        {/* Physical tactile neon golden pointer pointing down from top */}
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-neutral-950 rotate-45 z-30 rounded-br-lg rounded-tl-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex items-center justify-center border-b-4 border-r-4 border-amber-400">
-          <div className="w-2 h-2 bg-amber-400 rounded-full shadow-[0_0_8px_#f59e0b] animate-ping"></div>
+        {/* Playful cartoon hand-drawn indicator needle pointing down from top */}
+        <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center select-none pointer-events-none transition-transform hover:scale-110">
+          <svg className="w-10 h-10 drop-shadow-[0_4px_6px_rgba(139,92,26,0.12)] animate-bounce" style={{ animationDuration: '2.5s' }} viewBox="0 0 24 24">
+            <path
+              d="M12 22L4 6C4 6 8 3 12 3C16 3 20 6 20 6L12 22Z"
+              fill="#fb7185" /* Pastel coral red */
+              stroke="#be123c" /* Deep rose marker outline */
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <div className="w-3.5 h-3.5 rounded-full bg-[#fef08a] border-2 border-amber-700/40 -mt-2.5 shadow-xs" />
         </div>
 
-        {/* Tactical Dark Obsidian Outer Rim featuring golden LED studs */}
-        <div className="p-4 bg-gradient-to-tr from-neutral-950 to-neutral-800 rounded-full shadow-[0px_24px_55px_rgba(15,23,42,0.38)] relative border-4 border-neutral-950 flex items-center justify-center">
+        {/* Tactical Cardboard/Paper Sketch Plate Outer Rim - using wobbly borders and warm light shades */}
+        <div className="p-4 bg-[#fefbf6] rounded-[52%_48%_51%_49%] shadow-[0_12px_36px_rgba(139,92,26,0.06)] relative border-4 border-dashed border-amber-700/30 flex items-center justify-center self-center transition-all duration-300">
           
-          {/* Responsive golden outer LED studs (12 points around the wheel perimeter spacer) */}
+          {/* Cute cartoon star and blossom studs around the perimeter */}
           {Array.from({ length: 12 }).map((_, i) => (
             <React.Fragment key={i}>
-              {/* Mobile studs with running chase delay */}
               <div
-                className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full bg-gradient-to-tr from-amber-300 to-yellow-400 shadow-[0_0_6px_#f59e0b] border border-white/20 z-10 md:hidden pointer-events-none animate-pulse"
+                className="absolute left-1/2 top-1/2 text-sm z-10 select-none pointer-events-none origin-center"
                 style={{
-                  transform: `translate(-50%, -50%) rotate(${i * 30}deg) translateY(-141px)`,
-                  animationDelay: `${i * 150}ms`
+                  transform: `translate(-50%, -50%) rotate(${i * 30}deg) translateY(-166px)`,
                 }}
-              />
-              {/* Desktop/tablet studs with running chase delay */}
-              <div
-                className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full bg-gradient-to-tr from-amber-300 to-yellow-400 shadow-[0_0_8px_#f59e0b] border border-white/20 z-10 hidden md:block pointer-events-none animate-pulse"
-                style={{
-                  transform: `translate(-50%, -50%) rotate(${i * 30}deg) translateY(-164px)`,
-                  animationDelay: `${i * 150}ms`
-                }}
-              />
+              >
+                <span className="inline-block animate-pulse text-amber-400" style={{ animationDelay: `${i * 120}ms` }}>
+                  {i % 2 === 0 ? '🌸' : '⭐'}
+                </span>
+              </div>
             </React.Fragment>
           ))}
 
-          {/* The Spinning Wheel Core (Increased space by exactly 10%) */}
+          {/* The Spinning Wheel Core with handdrawn feel and border */}
           <div
             ref={wheelRef}
-            className="w-[264px] h-[264px] md:w-[308px] md:h-[308px] rounded-full overflow-hidden relative flex items-center justify-center border-4 border-neutral-900 shadow-[inset_0_4px_10px_rgba(255,255,255,0.15),_inset_0_-4px_10px_rgba(0,0,0,0.5)] bg-slate-900"
+            className="w-[264px] h-[264px] md:w-[308px] md:h-[308px] rounded-[49%_51%_48%_52%] overflow-hidden relative flex items-center justify-center border-4 border-amber-800/30 shadow-[inset_0_4px_12px_rgba(139,92,26,0.05),_0_5px_15px_rgba(139,92,26,0.04)] bg-amber-50/20"
             style={{
               background: getConicGradient(),
               transform: `rotate(${rotation}deg)`,
@@ -386,7 +389,7 @@ export function SpinWheelGame({ onSaveDecision, onRequestSuggestions, isAiLoadin
               willChange: 'transform'
             }}
           >
-            {/* Visual Wedge slice dividing lines to emphasize shapes and sharp edges */}
+            {/* Visual Wedge slice dividing lines styled like soft pencil traces */}
             {options.map((_, index) => {
               let accumulatedDegrees = 0;
               for (let i = 0; i <= index; i++) {
@@ -395,7 +398,7 @@ export function SpinWheelGame({ onSaveDecision, onRequestSuggestions, isAiLoadin
               return (
                 <div
                   key={`div-${index}`}
-                  className="absolute left-1/2 bottom-1/2 w-[2px] bg-neutral-950/25 border-l border-white/30 origin-bottom pointer-events-none"
+                  className="absolute left-1/2 bottom-1/2 w-[2px] bg-amber-900/10 border-l border-dashed border-white/50 origin-bottom pointer-events-none"
                   style={{
                     height: '50%',
                     transformOrigin: 'bottom center',
@@ -405,45 +408,48 @@ export function SpinWheelGame({ onSaveDecision, onRequestSuggestions, isAiLoadin
               );
             })}
 
-            {/* Display Labels relative to segment slices (Optimized & mathematically aligned radially) */}
+            {/* Display Labels designed as handwritten stickers */}
             {options.map((option, index) => {
               let prevDegrees = 0;
               for (let i = 0; i < index; i++) {
                 prevDegrees += (((weights[i] || 0) / 100) * 360);
               }
               const currentDegrees = (((weights[index] || 0) / 100) * 360);
-              // Calculate accurate radial bisector line angle
+              // Calculate radial bisector angle
               const angle = prevDegrees + (currentDegrees / 2);
 
               return (
                 <div
                   key={index}
-                  className="absolute pointer-events-none select-none text-on-surface font-sans font-extrabold text-[10px] md:text-[11px] truncate flex items-center justify-end"
+                  className="absolute pointer-events-none select-none text-amber-900 font-sans font-extrabold text-[10px] md:text-[11px] truncate flex items-center justify-end"
                   style={{
                     left: '50%',
                     top: '50%',
-                    width: '45%', // Spans perfectly from center outward
+                    width: '45%',
                     height: '24px',
                     transformOrigin: 'left center',
                     transform: `rotate(${angle - 90}deg) translateY(-50%)`
                   }}
                 >
-                  <span className="inline-block bg-white/95 backdrop-blur-xs px-2 py-1 rounded-full shadow-[0_2px_7px_rgba(0,0,0,0.22)] text-neutral-950 border border-white/40 max-w-[85px] md:max-w-[100px] truncate" title={`${option} (${weights[index]}%)`}>
-                    {option}
+                  <span className="inline-block bg-white/95 border-2 border-amber-700/20 px-2 py-1.5 rounded-xl shadow-xs text-amber-900 font-sans font-bold max-w-[85px] md:max-w-[100px] truncate" title={`${option} (${weights[index]}%)`}>
+                    ✏️ {option}
                   </span>
                 </div>
               );
             })}
 
-            {/* Metallic Center Hub Cover to lock in the presentation (10% enlargement) */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-gradient-to-tr from-neutral-800 to-neutral-700 rounded-full z-20 shadow-[0_4px_12px_rgba(0,0,0,0.4)] border-4 border-neutral-950 flex items-center justify-center">
-              <div className="w-5 h-5 bg-gradient-to-br from-primary to-tertiary rounded-full shadow-inner animate-pulse border border-white/20"></div>
+            {/* Adorable Cozy Pastel Button Center Pin with stitch detail */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-gradient-to-tr from-[#ffe4e6] to-[#ffd1d5] rounded-[49%_51%_48%_52%] z-20 shadow-[0_4px_8px_rgba(139,92,26,0.12)] border-2 border-amber-700/25 flex items-center justify-center">
+              <div className="flex gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-800/40" />
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-800/40" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Ambient shadow reflection base floor */}
-        <div className="w-[198px] md:w-[264px] h-3.5 bg-on-surface/10 rounded-[100%] mt-4.5 blur-sm mix-blend-multiply"></div>
+        {/* Soft handdrawn-looking shadow reflection base */}
+        <div className="w-[198px] md:w-[264px] h-3.5 bg-amber-900/5 rounded-[100%] mt-4.5 blur-xs mix-blend-multiply"></div>
       </div>
 
       {/* Active Options Chips display (With 10% elevated text sizes) */}
