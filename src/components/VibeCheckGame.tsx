@@ -63,6 +63,7 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
   const [progress, setProgress] = useState(0);
   const [vibeResult, setVibeResult] = useState<VibeResult>(CONSTANT_VIBES[0]);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -72,12 +73,41 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
     setCameraError(null);
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 400, height: 400, facingMode: 'user' }
-        });
+        // Stop current tracks first before starting a new stream to prevent permission locks
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+
+        let stream: MediaStream;
+        try {
+          // Attempt using standard, mobile-friendly 'ideal' properties rather than fixed constraints.
+          // This avoids the OverconstrainedError (TypeError) commonly seen on iOS and Android Chrome.
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: facingMode,
+              width: { ideal: 645 },
+              height: { ideal: 485 }
+            }
+          });
+        } catch (overconstrainedErr) {
+          console.warn("Retrying with minimal constraints fallback", overconstrainedErr);
+          // Standard fallback to prevent errors on strict-constraint browsers
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facingMode }
+          });
+        }
+
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // Android and iOS Chrome/Safari require explicit .play() trigger to resolve H.264 video block states
+          const playPromise = videoRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(e => {
+              console.warn("Webcam autoplay playPromise catch: play was interrupted or requires interaction", e);
+            });
+          }
         }
         setStreamActive(true);
       } else {
@@ -85,7 +115,7 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
       }
     } catch (err: any) {
       console.error("Camera access failed", err);
-      setCameraError("Access declined. Using preloaded high-fidelity portrait for vibe checking!");
+      setCameraError("Webcam access declined or currently busy. Please verify permissions in your mobile address bar, or utilize 'Random Card'!");
     }
   };
 
@@ -106,7 +136,7 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
     return () => {
       stopCamera();
     };
-  }, [step]);
+  }, [step, facingMode]);
 
   const handleSnapPhoto = () => {
     // If standard streaming is active, convert to canvas image
@@ -117,6 +147,11 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
         canvas.height = 400;
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          // Flip horizontally if front facing camera is used to match live video preview aspect
+          if (facingMode === 'user') {
+            ctx.translate(400, 0);
+            ctx.scale(-1, 1);
+          }
           ctx.drawImage(videoRef.current, 0, 0, 400, 400);
           setCapturedImage(canvas.toDataURL('image/png'));
         }
@@ -154,47 +189,55 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
       requestFinished = true;
     }
 
+    let curProgress = 0;
     const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          if (requestFinished) {
-            clearInterval(interval);
-            
-            let pickedVibe: VibeResult;
-            if (geminiResult && !geminiError) {
-              const colorClasses = [
-                "bg-emerald-500/10 text-emerald-700 border-emerald-200",
-                "bg-indigo-500/10 text-indigo-700 border-indigo-200",
-                "bg-rose-500/10 text-rose-700 border-rose-200"
-              ];
-              pickedVibe = {
-                ...geminiResult,
-                bubbles: (geminiResult.bubbles || []).map((b: any, index: number) => ({
-                  ...b,
-                  colorClass: colorClasses[index % colorClasses.length]
-                }))
-              };
-            } else {
-              const randomIndex = Math.floor(Math.random() * CONSTANT_VIBES.length);
-              pickedVibe = CONSTANT_VIBES[randomIndex];
-            }
-
-            setVibeResult(pickedVibe);
-            setStep('result');
-
-            onSaveDecision({
-              gameType: 'vibe',
-              title: 'Vibe Scanner',
-              result: pickedVibe.title,
-              options: pickedVibe.bubbles.map(b => `${b.label} (${b.percentage}%)`)
-            });
-
-            return 100;
+      if (curProgress >= 100) {
+        if (requestFinished) {
+          clearInterval(interval);
+          
+          let pickedVibe: VibeResult;
+          if (geminiResult && !geminiError) {
+            const colorClasses = [
+              "bg-emerald-500/10 text-emerald-700 border-emerald-200",
+              "bg-indigo-500/10 text-indigo-700 border-indigo-200",
+              "bg-rose-500/10 text-rose-700 border-rose-200"
+            ];
+            pickedVibe = {
+              ...geminiResult,
+              bubbles: (geminiResult.bubbles || []).map((b: any, index: number) => ({
+                ...b,
+                colorClass: colorClasses[index % colorClasses.length]
+              }))
+            };
+          } else {
+            const randomIndex = Math.floor(Math.random() * CONSTANT_VIBES.length);
+            pickedVibe = CONSTANT_VIBES[randomIndex];
           }
-          return 99;
+
+          setVibeResult(pickedVibe);
+          setStep('result');
+
+          onSaveDecision({
+            gameType: 'vibe',
+            title: 'Vibe Scanner',
+            result: pickedVibe.title,
+            options: pickedVibe.bubbles.map(b => `${b.label} (${b.percentage}%)`)
+          });
         }
-        return prev + 8;
-      });
+        return;
+      }
+      
+      const nextProgress = curProgress + 8;
+      if (nextProgress >= 100) {
+        if (requestFinished) {
+          curProgress = 100;
+        } else {
+          curProgress = 99;
+        }
+      } else {
+        curProgress = nextProgress;
+      }
+      setProgress(curProgress);
     }, 150);
 
     return () => clearInterval(interval);
@@ -225,7 +268,7 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
       {step === 'camera' && (
         <div className="w-full max-w-sm flex flex-col items-center p-4 bg-white border border-outline-variant/30 rounded-3xl shadow-sm">
           {/* Facial alignment camera viewport */}
-          <div className="relative w-60 h-60 rounded-2xl overflow-hidden bg-neutral-900 flex items-center justify-center border-2 border-primary/20 mb-4 animate-pulse">
+          <div className="relative w-60 h-60 rounded-2xl overflow-hidden bg-neutral-900 flex items-center justify-center border-2 border-primary/20 mb-4">
             
             {streamActive ? (
               <video
@@ -233,7 +276,7 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover scale-x-[-1]"
+                className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
               />
             ) : (
               <div className="text-center px-4">
@@ -255,16 +298,30 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
               </div>
             </div>
 
-            <div className="absolute top-2.5 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-bold text-white uppercase tracking-wider">
+            <div className="absolute top-2.5 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-bold text-white uppercase tracking-wider whitespace-nowrap z-10">
               Position your smiling face!
             </div>
+
+            {streamActive && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+                }}
+                className="absolute bottom-2.5 right-2.5 bg-black/75 hover:bg-black w-8 h-8 rounded-full flex items-center justify-center border border-white/10 shadow-md transition-all active:scale-95 z-10 cursor-pointer"
+                title="Switch Camera (Front/Rear)"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-[#ff7eb3]" />
+              </button>
+            )}
           </div>
 
           {/* Action triggers */}
           <div className="flex flex-col sm:flex-row items-center gap-2 w-full">
             <button
               onClick={handleSnapPhoto}
-              className="w-full bg-gradient-to-r from-primary to-tertiary text-white font-sans font-bold text-xs py-3 rounded-xl shadow-xs active:scale-95 transition-all duration-200 flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full bg-gradient-to-r from-primary to-tertiary text-white font-sans font-bold text-xs py-3 rounded-xl shadow-xs active:scale-95 transition-all duration-200 flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
             >
               <Camera className="w-4 h-4" />
               <span>Capture Vibe!</span>
@@ -272,7 +329,7 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
 
             <button
               onClick={handleUploadClick}
-              className="w-full sm:w-auto px-4 py-3 border border-outline-variant hover:border-primary text-outline bg-transparent hover:bg-primary/5 font-sans font-bold text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-1 focus:outline-none"
+              className="w-full sm:w-auto px-4 py-3 border border-outline-variant hover:border-primary text-outline bg-transparent hover:bg-primary/5 font-sans font-bold text-xs rounded-xl transition-all duration-200 flex items-center justify-center gap-1 focus:outline-none cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Random Card</span>
@@ -280,9 +337,19 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
           </div>
 
           {cameraError && (
-            <div className="mt-3 p-2 bg-indigo-50 border border-indigo-100 rounded-xl flex items-start gap-1.5 text-[10px] text-indigo-900 leading-tight">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-indigo-600 mt-0.5" />
-              <span>{cameraError}</span>
+            <div className="mt-3 p-3 bg-indigo-50/90 border border-indigo-150/40 rounded-xl flex flex-col gap-2 text-[10px] text-indigo-900 leading-tight w-full">
+              <div className="flex items-start gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-indigo-600 mt-0.5" />
+                <span>{cameraError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={startCamera}
+                className="self-center bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold text-[9px] px-3 py-1.5 rounded-lg transition-transform active:scale-95 uppercase tracking-wide cursor-pointer flex items-center gap-1"
+              >
+                <RefreshCw className="w-2.5 h-2.5" />
+                <span>Retry Camera Activation</span>
+              </button>
             </div>
           )}
 
