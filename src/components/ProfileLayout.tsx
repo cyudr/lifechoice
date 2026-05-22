@@ -56,7 +56,7 @@ export function ProfileLayout({
 
   // Local state for profile inputs
   const [editWalletEmail, setEditWalletEmail] = useState(walletProfile?.walletEmail || 'guest@arcade.local');
-  const [editPublisherId, setEditPublisherId] = useState(walletProfile?.publisherId || 'ca-pub-xaxnsazkrnwvzdrfbrsk');
+  const [editPublisherId, setEditPublisherId] = useState(walletProfile?.publisherId || 'ca-pub-8369709738621970');
   const [editAdSlotId, setEditAdSlotId] = useState(walletProfile?.adSlotId || '1092837482');
 
   // Interactive local login form
