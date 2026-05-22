@@ -18,6 +18,17 @@ import {
 
 import { GameType, DecisionHistoryEntry } from './types';
 import { AdSenseBanner } from './components/AdSenseBanner';
+import { 
+  supabase, 
+  signInAsGuest, 
+  signInWithEmail, 
+  signOutUser, 
+  syncWalletProfileToSupabase, 
+  fetchWalletProfileFromSupabase, 
+  UserWalletProfile, 
+  DEFAULT_PROFILE,
+  SUPABASE_SQL_CREATION_SNIPPET 
+} from './lib/supabase';
 import { SpinWheelGame } from './components/SpinWheelGame';
 import { CoinFlipGame } from './components/CoinFlipGame';
 import { FlowerPeelGame } from './components/FlowerPeelGame';
@@ -85,6 +96,44 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [history, setHistory] = useState<DecisionHistoryEntry[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Choice maker and AI limit states (5 usages limit)
+  const [usageCount, setUsageCount] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem('decision_studio_usage_count_v2');
+      return stored ? parseInt(stored, 10) : 0;
+    } catch (e) {
+      return 0;
+    }
+  });
+  
+  const [usageTimer, setUsageTimer] = useState<number>(() => {
+    try {
+      const storedTime = localStorage.getItem('decision_studio_limit_hit_timestamp_v2');
+      if (storedTime) {
+        const elapsed = Math.floor((Date.now() - parseInt(storedTime, 10)) / 1000);
+        if (elapsed < 60) {
+          return 60 - elapsed;
+        }
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  // Supabase Auth and Google Wallet States
+  const [sessionUser, setSessionUser] = useState<any | null>(null);
+  const [walletProfile, setWalletProfile] = useState<UserWalletProfile>({
+    userId: 'guest-local-' + Math.random().toString(36).substring(2, 9),
+    isAnonymous: true,
+    walletEmail: 'cyudreamz@gmail.com',
+    publisherId: 'ca-pub-8369709738621970',
+    adSlotId: '1092837482',
+    balance: 0.00,
+    clicks: 0,
+    impressions: 0
+  });
+  const [dbWarning, setDbWarning] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
 
   // Filtering based on search queries
   const filteredGrid = gameCards.filter(card =>
@@ -284,6 +333,225 @@ export default function App() {
     }
   }, []);
 
+  // Sync usage count and limit values to LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('decision_studio_usage_count_v2', usageCount.toString());
+      if (usageCount >= 5 && usageTimer > 0) {
+        const storedTime = localStorage.getItem('decision_studio_limit_hit_timestamp_v2');
+        if (!storedTime) {
+          localStorage.setItem('decision_studio_limit_hit_timestamp_v2', Date.now().toString());
+        }
+      } else if (usageCount < 5) {
+        localStorage.removeItem('decision_studio_limit_hit_timestamp_v2');
+      }
+    } catch (e) {}
+  }, [usageCount, usageTimer]);
+
+  // Handle auto timer activation if user reaches 5/5
+  useEffect(() => {
+    if (usageCount >= 5 && usageTimer === 0) {
+      setUsageTimer(60);
+      localStorage.setItem('decision_studio_limit_hit_timestamp_v2', Date.now().toString());
+    }
+  }, [usageCount]);
+
+  // Manage Countdown timer interval
+  useEffect(() => {
+    if (usageTimer > 0) {
+      const interval = setInterval(() => {
+        setUsageTimer(prev => {
+          if (prev <= 1) {
+            setUsageCount(0);
+            localStorage.removeItem('decision_studio_limit_hit_timestamp_v2');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [usageTimer]);
+
+  // Auto-clear usage count if elapsed cross-refresh
+  useEffect(() => {
+    try {
+      const storedTime = localStorage.getItem('decision_studio_limit_hit_timestamp_v2');
+      if (storedTime) {
+        const elapsed = Math.floor((Date.now() - parseInt(storedTime, 10)) / 1000);
+        if (elapsed >= 60) {
+          setUsageCount(0);
+          setUsageTimer(0);
+          localStorage.removeItem('decision_studio_limit_hit_timestamp_v2');
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  // Sync profile details from Supabase & manage sessions
+  const loadUserProfile = async (userId: string, isAnon: boolean, email?: string) => {
+    setSyncLoading(true);
+    setDbWarning(null);
+    try {
+      const res = await fetchWalletProfileFromSupabase(userId);
+      if (res.dbWarning) {
+        setDbWarning(res.error);
+        // Table missing! Use localStorage profiles
+        const localProfile = localStorage.getItem('ad_revenue_local_profile_v2');
+        if (localProfile) {
+          try {
+            const parsed = JSON.parse(localProfile);
+            setWalletProfile({
+              ...parsed,
+              userId,
+              isAnonymous: isAnon
+            });
+          } catch (e) {}
+        } else {
+          setWalletProfile(prev => ({
+            ...prev,
+            userId,
+            isAnonymous: isAnon,
+            walletEmail: email || prev.walletEmail
+          }));
+        }
+      } else if (res.data) {
+        setWalletProfile(res.data);
+      } else {
+        // Initial setup for new user
+        const newProf: UserWalletProfile = {
+          userId,
+          isAnonymous: isAnon,
+          walletEmail: email || 'cyudreamz@gmail.com',
+          publisherId: 'ca-pub-8369709738621970',
+          adSlotId: '1092837482',
+          balance: 0.00,
+          clicks: 0,
+          impressions: 0
+        };
+        const syncRes = await syncWalletProfileToSupabase(newProf);
+        if (syncRes.dbWarning) {
+          setDbWarning(syncRes.error);
+        }
+        setWalletProfile(newProf);
+        localStorage.setItem('ad_revenue_local_profile_v2', JSON.stringify(newProf));
+      }
+    } catch (err) {
+      console.error("Error loading profile", err);
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async (updated: Partial<UserWalletProfile>) => {
+    const newProfile = {
+      ...walletProfile,
+      ...updated
+    };
+    setWalletProfile(newProfile);
+    localStorage.setItem('ad_revenue_local_profile_v2', JSON.stringify(newProfile));
+
+    try {
+      const res = await syncWalletProfileToSupabase(newProfile);
+      if (res.dbWarning) {
+        setDbWarning(res.error);
+      } else if (res.success) {
+        setDbWarning(null);
+      }
+    } catch (err) {
+      console.error("Error updates profile", err);
+    }
+  };
+
+  const handleAddAdRevenue = async (amount: number, isClick: boolean) => {
+    if (isClick) {
+      setUsageCount(0);
+      setUsageTimer(0);
+      localStorage.removeItem('decision_studio_limit_hit_timestamp_v2');
+      alert("⚡ Thanks for supporting Spark Arcade! Your 5 free choice session tokens have been instantly fully reloaded! Keep spinning!");
+    }
+
+    const newProfile = {
+      ...walletProfile,
+      balance: Number((walletProfile.balance + amount).toFixed(4)),
+      clicks: walletProfile.clicks + (isClick ? 1 : 0),
+      impressions: walletProfile.impressions + (isClick ? 0 : 1)
+    };
+    setWalletProfile(newProfile);
+    localStorage.setItem('ad_revenue_local_profile_v2', JSON.stringify(newProfile));
+
+    try {
+      const res = await syncWalletProfileToSupabase(newProfile);
+      if (res.dbWarning) {
+        setDbWarning(res.error);
+      } else {
+        setDbWarning(null);
+      }
+    } catch (err) {
+      console.error("Error adding ad revenue", err);
+    }
+  };
+
+  // Auth Listener configuration
+  useEffect(() => {
+    let authSubscription: any = null;
+
+    const setupAuth = async () => {
+      // Check current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setSessionUser(session.user);
+        await loadUserProfile(session.user.id, !!session.user.is_anonymous, session.user.email);
+      } else {
+        setSessionUser(null);
+        const localUserId = localStorage.getItem('ad_revenue_local_userid') || 'guest-local-' + Math.random().toString(36).substring(2, 9);
+        localStorage.setItem('ad_revenue_local_userid', localUserId);
+
+        const localProfile = localStorage.getItem('ad_revenue_local_profile_v2');
+        if (localProfile) {
+          try {
+            setWalletProfile(JSON.parse(localProfile));
+          } catch (e) {}
+        } else {
+          setWalletProfile({
+            userId: localUserId,
+            isAnonymous: true,
+            walletEmail: 'cyudreamz@gmail.com',
+            publisherId: 'ca-pub-8369709738621970',
+            adSlotId: '1092837482',
+            balance: 0.00,
+            clicks: 0,
+            impressions: 0
+          });
+        }
+      }
+
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+          setSessionUser(session.user);
+          await loadUserProfile(session.user.id, !!session.user.is_anonymous, session.user.email);
+        } else {
+          setSessionUser(null);
+          const localUserId = localStorage.getItem('ad_revenue_local_userid') || 'guest-local-' + Math.random().toString(36).substring(2, 9);
+          setWalletProfile(prev => ({
+            ...prev,
+            userId: localUserId,
+            isAnonymous: true
+          }));
+        }
+      });
+      authSubscription = data;
+    };
+
+    setupAuth();
+
+    return () => {
+      if (authSubscription?.subscription?.unsubscribe) {
+        authSubscription.subscription.unsubscribe();
+      }
+    };
+  }, []);
+
   // Sync back to localStorage when history shifts
   const saveHistory = (newList: DecisionHistoryEntry[]) => {
     setHistory(newList);
@@ -295,6 +563,13 @@ export default function App() {
   };
 
   const handleSaveDecision = (entry: Omit<DecisionHistoryEntry, 'id' | 'timestamp'>) => {
+    if (usageCount >= 5) {
+      alert("Usage limit met! Close this box, scroll down and click on any sponsored banner layout to instantly recharge your 5 free sessions!");
+      return;
+    }
+    
+    setUsageCount(prev => prev + 1);
+
     const formattedEntry: DecisionHistoryEntry = {
       ...entry,
       id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
@@ -316,6 +591,12 @@ export default function App() {
 
   // Call server-side helper for Gemini completions
   const handleRequestAiSuggestions = async (promptType: string, count: number): Promise<string[]> => {
+    if (usageCount >= 5) {
+      alert("Usage limit met! Scroll down and click any sponsored banner to instantly reload your energy!");
+      return [];
+    }
+    setUsageCount(prev => prev + 1);
+
     setAiLoading(true);
     try {
       const res = await fetch('/api/gemini/options', {
@@ -346,6 +627,12 @@ export default function App() {
     emoji: string,
     length: string
   ): Promise<string[]> => {
+    if (usageCount >= 5) {
+      alert("Usage limit met! Scroll down and click any sponsored banner to instantly reload your energy!");
+      return [];
+    }
+    setUsageCount(prev => prev + 1);
+
     setAiLoading(true);
     try {
       const res = await fetch('/api/gemini/texts', {
@@ -372,6 +659,12 @@ export default function App() {
 
   // Call server-side helper for Gemini biometric/aura vibe analysis
   const handleRequestVibeAnalysis = async (customInput?: string): Promise<any> => {
+    if (usageCount >= 5) {
+      alert("Usage limit met! Scroll down and click any sponsored banner to instantly reload your energy!");
+      return null;
+    }
+    setUsageCount(prev => prev + 1);
+
     setAiLoading(true);
     try {
       const res = await fetch('/api/gemini/vibe', {
@@ -584,12 +877,45 @@ export default function App() {
                 <h1 className="font-display font-black text-3xl sm:text-4xl text-[#131b2e] leading-tight tracking-tight mt-3 text-glow">
                   Spark <span className="bg-gradient-to-r from-primary via-[#ff56a7] to-tertiary bg-clip-text text-transparent">Arcade</span>
                 </h1>
-                <p className="font-sans text-xs text-on-surface-variant max-w-sm sm:max-w-md mx-auto mt-1.5 leading-relaxed font-bold">
-                  Say goodbye to boring decision paralysis! Shuffle coins, spin futuristic wheels, pluck daisy oracle petals, and scan your organic aura vibes below!
+                
+                {/* Punchy 4-word trigger to make people use the app */}
+                <p className="font-sans text-xs text-indigo-600 font-black tracking-wider uppercase mt-1.5 animate-pulse">
+                  ⚡ Overthink less, spin now! ⚡
                 </p>
+
+                {/* Visual energy credit tracker */}
+                <div className="max-w-xs mx-auto mt-3.5 bg-slate-50 border border-slate-200/60 rounded-2xl p-2.5 flex items-center justify-between text-left shadow-xs relative overflow-hidden group">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm animate-bounce" style={{ animationDuration: '3s' }}>⚡</span>
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase font-mono block tracking-wider leading-none">Arcade Energy</span>
+                      <span className="text-xs font-extrabold text-slate-700 block mt-0.5">
+                        {usageCount >= 5 ? 'RECHARGING...' : `${5 - usageCount} of 5 spins left`}
+                      </span>
+                    </div>
+                  </div>
+                  {usageCount >= 5 ? (
+                    <div className="bg-amber-100 border border-amber-300 text-amber-900 font-mono text-[9px] font-bold px-2 py-0.5 rounded-md animate-pulse">
+                      RELOAD: {usageTimer}s
+                    </div>
+                  ) : (
+                    <div className="flex gap-1 shrink-0">
+                      {[1, 2, 3, 4, 5].map((idx) => (
+                        <div 
+                          key={idx} 
+                          className={`w-2.5 h-4.5 rounded-sm transition-all duration-300 ${
+                            idx <= (5 - usageCount) 
+                              ? 'bg-gradient-to-t from-indigo-500 to-indigo-400 border-b-2 border-indigo-700' 
+                              : 'bg-slate-200 border-b-2 border-slate-300'
+                          }`} 
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
                 
                 {/* Search bar alignment option */}
-                <div className="relative max-w-xs mx-auto mt-3">
+                <div className="relative max-w-xs mx-auto mt-3.5">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-outline" />
                   <input
                     type="text"
@@ -658,46 +984,84 @@ export default function App() {
 
               {/* Intertwined elegant AdSense slot to minimize scrolling */}
               <div className="py-1">
-                <AdSenseBanner />
+                <AdSenseBanner walletProfile={walletProfile} onAddRevenue={handleAddAdRevenue} />
               </div>
 
             </div>
           )}
 
-          {activeScreen === 'wheel' && (
-            <SpinWheelGame
-              onSaveDecision={handleSaveDecision}
-              onRequestSuggestions={handleRequestAiSuggestions}
-              isAiLoading={aiLoading}
-            />
-          )}
+          {['wheel', 'coin', 'flower', 'vibe', 'poll', 'text'].includes(activeScreen) && usageCount >= 5 ? (
+            <div className="w-full max-w-md mx-auto bg-white border border-outline-variant/30 rounded-3xl p-6.5 text-center shadow-lg relative overflow-hidden my-6 animate-fade-in">
+              <div className="absolute top-0 right-0 py-1.5 px-3 bg-indigo-600 text-white select-none text-[9px] uppercase font-black font-mono tracking-widest rounded-bl-2xl">
+                Cool-down Active 🧊
+              </div>
+              
+              <div className="w-14 h-14 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-2xl mx-auto mb-4 animate-bounce" style={{ animationDuration: '3s' }}>
+                🔋
+              </div>
+              
+              <h3 className="font-display font-black text-base text-slate-800 leading-tight">
+                Arcade Energy Depleted
+              </h3>
+              <p className="text-xs text-slate-500 font-sans mt-2 max-w-xs mx-auto leading-relaxed">
+                Guest sessions are limited to 5 spins per cool-down to ensure fair access for everyone!
+              </p>
 
-          {activeScreen === 'coin' && (
-            <CoinFlipGame onSaveDecision={handleSaveDecision} />
-          )}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 my-4 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold font-mono tracking-wider block">Time Remaining for Free Auto-Reload</span>
+                <span className="font-mono font-black text-3xl text-indigo-600 block mt-1 tracking-widest">
+                  00:{usageTimer < 10 ? `0${usageTimer}` : usageTimer}
+                </span>
+              </div>
 
-          {activeScreen === 'flower' && (
-            <FlowerPeelGame onSaveDecision={handleSaveDecision} />
-          )}
+              <div className="bg-gradient-to-tr from-indigo-50/50 to-white border border-indigo-100 rounded-2xl p-4 text-left font-sans">
+                <h4 className="font-sans font-bold text-xs text-indigo-950 flex items-center gap-1.5">
+                  <span>⚡</span>
+                  <span>Instant Recharge with Supported Ads</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-1 font-sans leading-relaxed">
+                  Avoid the wait entirely! **Click and view any sponsored banner ad below** to instantly restore your 5 free choice game sessions. Thanks for supporting our indie servers!
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeScreen === 'wheel' && (
+                <SpinWheelGame
+                  onSaveDecision={handleSaveDecision}
+                  onRequestSuggestions={handleRequestAiSuggestions}
+                  isAiLoading={aiLoading}
+                />
+              )}
 
-          {activeScreen === 'vibe' && (
-            <VibeCheckGame
-              onSaveDecision={handleSaveDecision}
-              onRequestVibe={handleRequestVibeAnalysis}
-              isAiLoading={aiLoading}
-            />
-          )}
+              {activeScreen === 'coin' && (
+                <CoinFlipGame onSaveDecision={handleSaveDecision} />
+              )}
 
-          {activeScreen === 'poll' && (
-            <LunchPollGame onSaveDecision={handleSaveDecision} />
-          )}
+              {activeScreen === 'flower' && (
+                <FlowerPeelGame onSaveDecision={handleSaveDecision} />
+              )}
 
-          {activeScreen === 'text' && (
-            <TextTellGame
-              onSaveDecision={handleSaveDecision}
-              onRequestTextHelp={handleRequestTextHelp}
-              isAiLoading={aiLoading}
-            />
+              {activeScreen === 'vibe' && (
+                <VibeCheckGame
+                  onSaveDecision={handleSaveDecision}
+                  onRequestVibe={handleRequestVibeAnalysis}
+                  isAiLoading={aiLoading}
+                />
+              )}
+
+              {activeScreen === 'poll' && (
+                <LunchPollGame onSaveDecision={handleSaveDecision} />
+              )}
+
+              {activeScreen === 'text' && (
+                <TextTellGame
+                  onSaveDecision={handleSaveDecision}
+                  onRequestTextHelp={handleRequestTextHelp}
+                  isAiLoading={aiLoading}
+                />
+              )}
+            </>
           )}
 
           {activeScreen === 'history' && (
@@ -711,7 +1075,13 @@ export default function App() {
           {activeScreen === 'profile' && (
             <ProfileLayout
               history={history}
+              userEmail={sessionUser?.email || walletProfile.walletEmail}
               onClearAllUserData={handleClearAllUserData}
+              walletProfile={walletProfile}
+              onSaveProfile={handleSaveProfile}
+              dbWarning={dbWarning}
+              syncLoading={syncLoading}
+              sessionUser={sessionUser}
             />
           )}
 
@@ -723,7 +1093,7 @@ export default function App() {
         {/* Dynamic Ad Placement Block at footer bottom */}
         {activeScreen !== 'dashboard' && (
           <div className="mt-12 w-full pt-12 border-t border-outline-variant/10">
-            <AdSenseBanner />
+            <AdSenseBanner walletProfile={walletProfile} onAddRevenue={handleAddAdRevenue} />
           </div>
         )}
       </main>

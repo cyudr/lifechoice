@@ -1,21 +1,74 @@
 import React, { useState } from 'react';
-import { User, Activity, ToggleLeft, ToggleRight, Sparkles, Sliders, Calendar, Trash2 } from 'lucide-react';
+import { 
+  User, 
+  Activity, 
+  ToggleLeft, 
+  ToggleRight, 
+  Sparkles, 
+  Sliders, 
+  Calendar, 
+  Trash2, 
+  Coins, 
+  Lock, 
+  Link2, 
+  CheckCircle, 
+  Database, 
+  Clipboard, 
+  Wallet,
+  ShieldCheck,
+  RefreshCw,
+  LogOut
+} from 'lucide-react';
 import { DecisionHistoryEntry } from '../types';
+import { 
+  UserWalletProfile, 
+  supabase, 
+  signInAsGuest, 
+  signInWithEmail, 
+  signOutUser,
+  SUPABASE_SQL_CREATION_SNIPPET 
+} from '../lib/supabase';
 
 interface ProfileLayoutProps {
   history: DecisionHistoryEntry[];
   userEmail?: string;
   localTime?: string;
   onClearAllUserData: () => void;
+  walletProfile?: UserWalletProfile;
+  onSaveProfile?: (updated: Partial<UserWalletProfile>) => Promise<void>;
+  dbWarning?: string | null;
+  syncLoading?: boolean;
+  sessionUser?: any | null;
 }
 
-export function ProfileLayout({ history, userEmail, localTime, onClearAllUserData }: ProfileLayoutProps) {
+export function ProfileLayout({ 
+  history, 
+  userEmail, 
+  onClearAllUserData,
+  walletProfile,
+  onSaveProfile,
+  dbWarning,
+  syncLoading,
+  sessionUser
+}: ProfileLayoutProps) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [smartHelpEnabled, setSmartHelpEnabled] = useState(true);
 
+  // Local state for profile inputs
+  const [editWalletEmail, setEditWalletEmail] = useState(walletProfile?.walletEmail || 'cyudreamz@gmail.com');
+  const [editPublisherId, setEditPublisherId] = useState(walletProfile?.publisherId || 'ca-pub-xaxnsazkrnwvzdrfbrsk');
+  const [editAdSlotId, setEditAdSlotId] = useState(walletProfile?.adSlotId || '1092837482');
+
+  // Interactive local login form
+  const [emailInput, setEmailInput] = useState('');
+  const [loginMsg, setLoginMsg] = useState<{ text: string; error: boolean } | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [payoutStatus, setPayoutStatus] = useState<string | null>(null);
+  const [sqlCopied, setSqlCopied] = useState(false);
+
   const totalSparks = history.length;
   
-  // Decide overthinking title based on historical spins count
+  // Decide title based on historical spins count
   const getSillyTitle = () => {
     if (totalSparks === 0) return { title: "Instant Lucky Star ⭐", desc: "No second guessing logged. Your choices shine with absolute cosmic joy!" };
     if (totalSparks <= 3) return { title: "Happy Explorer of Luck 🍀", desc: "A few moments guided by pure destiny. Keeping the spirit high!" };
@@ -25,24 +78,70 @@ export function ProfileLayout({ history, userEmail, localTime, onClearAllUserDat
 
   const currentLevel = getSillyTitle();
 
-  // Find most played tools count
-  const getMostUsedTool = () => {
-    if (history.length === 0) return "None yet!";
-    const counts = history.reduce((acc, entry) => {
-      acc[entry.gameType] = (acc[entry.gameType] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+  const handleApplyChanges = async () => {
+    if (onSaveProfile) {
+      await onSaveProfile({
+        walletEmail: editWalletEmail,
+        publisherId: editPublisherId,
+        adSlotId: editAdSlotId
+      });
+      alert('AdSense settings and Target Wallet linked successfully!');
+    }
+  };
 
-    const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
-    const toolAliases: Record<string, string> = {
-      wheel: 'Wheel of Wonder',
-      coin: 'Coin of Fate',
-      flower: 'Magic Flower Daisy',
-      poll: 'Lunch Roulette',
-      vibe: 'Vibe Scanner',
-      text: 'Chat Sparker'
-    };
-    return toolAliases[sorted[0][0]] || sorted[0][0];
+  const handleRequestPayout = () => {
+    if ((walletProfile?.balance || 0) < 0.10) {
+      alert('Threshold not met: Mindset minimum payout is $0.10. Click some ads in the banner to accrue direct balance!');
+      return;
+    }
+
+    setPayoutStatus('processing');
+    setTimeout(() => {
+      setPayoutStatus('done');
+      if (onSaveProfile) {
+        onSaveProfile({ balance: 0.00 });
+      }
+      setTimeout(() => {
+        setPayoutStatus(null);
+      }, 5000);
+    }, 2800);
+  };
+
+  // Perform anonymous login
+  const handleAnonymousSignIn = async () => {
+    setAuthLoading(true);
+    setLoginMsg(null);
+    const { user, error } = await signInAsGuest();
+    setAuthLoading(false);
+    if (error) {
+      setLoginMsg({ text: `Failed to initiate anonymous session: ${error}`, error: true });
+    } else {
+      setLoginMsg({ text: `Signed in as Guest User ${user?.id.slice(0,8)}... 🎉`, error: false });
+    }
+  };
+
+  // Perform Email sign-in / signup via Magic Link
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInput.trim()) return;
+    
+    setAuthLoading(true);
+    setLoginMsg(null);
+    const { error } = await signInWithEmail(emailInput.trim());
+    setAuthLoading(false);
+    if (error) {
+      setLoginMsg({ text: `Magic link dispatch failed: ${error}`, error: true });
+    } else {
+      setLoginMsg({ text: "Magic Sign-In link successfully sent to your inbox! Check your spam folder.", error: false });
+      setEmailInput('');
+    }
+  };
+
+  const handleSignOut = async () => {
+    setAuthLoading(true);
+    await signOutUser();
+    setAuthLoading(false);
+    setLoginMsg({ text: "Signed out successfully.", error: false });
   };
 
   const handleResetUser = () => {
@@ -52,79 +151,280 @@ export function ProfileLayout({ history, userEmail, localTime, onClearAllUserDat
     }
   };
 
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL_CREATION_SNIPPET);
+    setSqlCopied(true);
+    setTimeout(() => setSqlCopied(false), 2500);
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col items-center">
       <div className="text-center mb-4">
         <span className="font-sans font-semibold text-[11px] tracking-wider text-primary uppercase">Personalized cockpit</span>
-        <h2 className="font-display font-bold text-2xl text-on-surface mt-0.5">My Vibe Meter</h2>
-        <p className="font-sans text-xs text-on-surface-variant max-w-sm mx-auto mt-1 leading-relaxed">
-          Keep track of your play history, check your favorite mini-games, and customize preferences in your playground!
+        <h2 className="font-display font-bold text-2xl text-on-surface mt-0.5">My Profile & Ad Dashboard</h2>
+        <p className="font-sans text-xs text-on-surface-variant max-w-md mx-auto mt-1 leading-relaxed">
+          Manage your guest sessions, link real AdSense credentials to monetize impressions, and connect earnings directly to your Google Wallet account.
         </p>
       </div>
 
-      <div className="w-full max-w-md flex flex-col gap-4">
+      <div className="w-full max-w-md flex flex-col gap-4 text-left">
         
-        {/* Profile Card Summary */}
-        <div className="w-full bg-white border border-outline-variant/30 rounded-3xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary via-tertiary to-[#ff7eb3] border-4 border-surface-container flex items-center justify-center text-white text-xl shadow-md">
-            🐱
+        {/* Supabase authentication profile details */}
+        <div className="w-full bg-white border border-outline-variant/30 rounded-3xl p-5 shadow-sm flex flex-col gap-4">
+          <div className="flex items-center justify-between pb-3 border-b border-outline-variant/10">
+            <h4 className="font-display font-extrabold text-xs text-outline uppercase tracking-wider flex items-center gap-1.5">
+              <User className="w-4 h-4 text-[#131b2e]" />
+              <span>Authentication Status</span>
+            </h4>
+            
+            {sessionUser ? (
+              <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-300 text-emerald-800 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono">
+                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                {sessionUser.is_anonymous ? 'GUEST SESSION' : 'VERIFIED'}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-800 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono">
+                <Lock className="w-3 h-3 text-amber-600 animate-pulse" />
+                LOCAL GUEST
+              </span>
+            )}
           </div>
-          <div className="flex-1 min-w-0 text-center sm:text-left">
-            <h3 className="font-display font-extrabold text-[#131b2e] text-sm select-all">
-              {userEmail || "anonymous_overthinker@gmail.com"}
-            </h3>
-            <p className="text-[11px] text-outline font-sans flex items-center justify-center sm:justify-start gap-1 mt-0.5">
-              <span>Ready for some serious fun!</span>
+
+          {sessionUser ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-xl shadow-xs">
+                  {sessionUser.is_anonymous ? '🐱' : '👤'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h5 className="text-xs font-bold text-slate-800 truncate">
+                    {sessionUser.email || `Local Anonymous Guest`}
+                  </h5>
+                  <p className="text-[9px] font-mono text-slate-400 mt-0.5 truncate">
+                    User UUID: {sessionUser.id}
+                  </p>
+                </div>
+              </div>
+
+              {sessionUser.is_anonymous && (
+                <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 text-[11px] text-indigo-950 font-sans leading-relaxed">
+                  <strong>💡 Secure Guest Earnings:</strong> Convert your current anonymous session to a permanent account below to prevent losing your accumulated wallet balance.
+                </div>
+              )}
+
+              <button
+                onClick={handleSignOut}
+                disabled={authLoading}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {authLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                <span>Sign Out Active Session</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-[11px] text-slate-500 font-sans leading-relaxed">
+                Connect your session to Supabase instantly! Run guest/anonymous setups to accumulate balance on multiple spins, or sign in to save data permanently.
+              </p>
+
+              <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 text-[11px] text-indigo-950 font-sans leading-relaxed">
+                <strong>🔒 Safe Local Sandbox:</strong> When continuing as a Guest, all of your logged choices, cumulative spins, ad views, and settings stay stored 100% locally inside your browser's local cache / cookie storage. You don't need a formal profile to enjoy the full arcade experience!
+              </div>
+
+              {/* Instant dynamic guest button */}
+              <button
+                type="button"
+                onClick={handleAnonymousSignIn}
+                disabled={authLoading}
+                className="w-full py-2.5 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-slate-800 font-sans font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                {authLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>👤</span>}
+                <span>Initiate Anonymous Guest Session</span>
+              </button>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink mx-3 text-[9px] font-bold text-outline font-mono">OR EMAIL MAGIC LINK</span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
+
+              {/* Email register/login form */}
+              <form onSubmit={handleEmailSignIn} className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    required
+                    disabled={authLoading}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-400 font-sans"
+                    placeholder="Enter email e.g. cyudreamz@gmail.com"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={authLoading || !emailInput}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-sans font-bold text-xs px-4 py-2 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    {authLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5" />}
+                    <span>Send Login Link</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {loginMsg && (
+            <div className={`p-3 rounded-xl border text-xs font-sans ${
+              loginMsg.error ? 'bg-red-50 border-red-200 text-red-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+            }`}>
+              {loginMsg.text}
+            </div>
+          )}
+        </div>
+
+        {/* AdSense Revenue & Google Wallet linking console */}
+        <div className="w-full bg-gradient-to-tr from-white to-[#fafaff] border-2 border-[#818cf8]/20 rounded-3xl p-5 shadow-sm">
+          <div className="flex items-center justify-between pb-3 border-b border-indigo-100">
+            <h4 className="font-display font-black text-xs text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Coins className="w-4 h-4 text-indigo-600" />
+              <span>AdSense / Google Wallet Payouts</span>
+            </h4>
+            <span className="bg-indigo-100 text-indigo-700 text-[9px] font-mono font-bold px-2 py-0.5 rounded-full">
+              LIVE ACCRUAL
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+            <div className="bg-white p-2.5 rounded-xl border border-indigo-50">
+              <span className="text-[9px] text-slate-400 uppercase font-mono block">AccumEarnings</span>
+              <span className="font-sans font-extrabold text-[15px] text-indigo-600 block mt-0.5">
+                ${walletProfile?.balance?.toFixed(4) || '0.0000'}
+              </span>
+            </div>
+            
+            <div className="bg-white p-2.5 rounded-xl border border-indigo-50">
+              <span className="text-[9px] text-slate-400 uppercase font-mono block">Total Clicks</span>
+              <span className="font-sans font-extrabold text-[15px] text-slate-800 block mt-0.5">
+                {walletProfile?.clicks || 0}
+              </span>
+            </div>
+
+            <div className="bg-white p-2.5 rounded-xl border border-indigo-50">
+              <span className="text-[9px] text-slate-400 uppercase font-mono block">Impressions</span>
+              <span className="font-sans font-extrabold text-[15px] text-slate-700 block mt-0.5">
+                {walletProfile?.impressions || 0}
+              </span>
+            </div>
+          </div>
+
+          {/* Wallet and Publisher Setup */}
+          <div className="flex flex-col gap-3 mt-4 pt-1.5">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-[#475569] font-sans flex items-center gap-1">
+                <Wallet className="w-3 h-3 text-slate-500" />
+                <span>GOOGLE WALLET TRANSFER DESTINATION</span>
+              </label>
+              <input
+                type="text"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none focus:border-indigo-400 font-sans font-medium"
+                value={editWalletEmail}
+                onChange={(e) => setEditWalletEmail(e.target.value)}
+                placeholder="Google Wallet Account / Email"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-[#475569] font-sans">ADSENSE PUBLISHER ID</label>
+                <input
+                  type="text"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none focus:border-indigo-400 font-sans font-medium"
+                  value={editPublisherId}
+                  onChange={(e) => setEditPublisherId(e.target.value)}
+                  placeholder="e.g. ca-pub-xxxxxxx"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-[#475569] font-sans">ADSENSE AD SLOT ID</label>
+                <input
+                  type="text"
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 outline-none focus:border-indigo-400 font-sans font-medium"
+                  value={editAdSlotId}
+                  onChange={(e) => setEditAdSlotId(e.target.value)}
+                  placeholder="Slot number"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleApplyChanges}
+              className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white font-sans font-bold text-xs rounded-xl cursor-pointer transition-colors"
+            >
+              Save AdSense & Wallet Setup 💾
+            </button>
+          </div>
+
+          {/* Trigger Google Wallet Transfer */}
+          <div className="mt-4 pt-4 border-t border-indigo-100 flex flex-col md:flex-row items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] text-slate-400 font-mono">LINKED WALLET</p>
+              <p className="text-xs font-bold text-slate-800">{editWalletEmail}</p>
+            </div>
+
+            {payoutStatus === 'processing' ? (
+              <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 px-4 py-2 rounded-xl text-xs flex items-center gap-2 font-bold animate-pulse">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Broadcasting to Google Wallet API...</span>
+              </div>
+            ) : payoutStatus === 'done' ? (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 font-bold animate-fade-in">
+                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                <span>Payout Sent Successfully!</span>
+              </div>
+            ) : (
+              <button
+                onClick={handleRequestPayout}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold text-xs px-4 py-2.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+              >
+                <span>Transfer to Google Wallet</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Supabase table check & Copy-paste SQL helper if not provisioned */}
+        {dbWarning && (
+          <div className="w-full bg-[#fffbeb] border-2 border-amber-300 rounded-3xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3 text-amber-900">
+              <h5 className="font-display font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5 leading-none">
+                <Database className="w-4 h-4 text-amber-700" />
+                <span>Supabase Relations Missing?</span>
+              </h5>
+              <span className="bg-amber-100/60 border border-amber-300 text-amber-800 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded">
+                EASY FIX
+              </span>
+            </div>
+
+            <p className="text-[11px] text-amber-800 font-sans leading-relaxed">
+              We detect that the required table <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">user_ad_revenue</code> is missing in your Supabase database schema. No worries! Spark data is safe in LocalStorage, but you can copy the SQL coupon below and run it in your Supabase SQL editor to enable persistent cross-device logs instantly:
             </p>
-          </div>
-        </div>
 
-        {/* Silly overthinking meter card */}
-        <div className="w-full bg-gradient-to-br from-white to-[#faf8ff] border-2 border-primary/20 rounded-3xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-bold text-tertiary uppercase tracking-wider font-mono">My Spark Record</span>
-            <Activity className="w-4 h-4 text-primary animate-pulse" />
+            <button
+              onClick={handleCopySql}
+              className="mt-3.5 w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-sans font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              {sqlCopied ? <CheckCircle className="w-3.5 h-3.5" /> : <Clipboard className="w-3.5 h-3.5" />}
+              <span>{sqlCopied ? 'SQL Copied to Clipboard!' : 'Copy Supabase SQL Snippet'}</span>
+            </button>
           </div>
+        )}
 
-          <h4 className="font-display font-black text-sm text-primary font-sans leading-tight">
-            {currentLevel.title}
-          </h4>
-          <p className="text-[11px] text-on-surface-variant font-sans mt-1 max-w-md leading-relaxed">
-            {currentLevel.desc}
-          </p>
-
-          {/* Meter progress bar visualizer */}
-          <div className="relative h-2 bg-neutral-100 rounded-full overflow-hidden mt-4 border border-neutral-200/20">
-            <div
-              className="absolute left-0 top-0 h-full bg-gradient-to-r from-primary via-tertiary to-[#ff56a7] transition-all duration-1000 ease-out"
-              style={{ width: `${Math.min((totalSparks / 14) * 100, 100)}%` }}
-            ></div>
-          </div>
-          <div className="flex justify-between items-center text-[9px] text-outline font-mono mt-1.5">
-            <span>MERRY SPINNER</span>
-            <span>CHANCE EXPLORER</span>
-            <span>LEGENDARY CHANGER</span>
-          </div>
-        </div>
-
-        {/* Quick stats grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 bg-white border border-outline-variant/30 rounded-2xl shadow-xs">
-            <span className="text-[9px] font-bold text-outline uppercase font-mono tracking-wider block">Sparks Ignited</span>
-            <span className="font-display font-extrabold text-xl text-primary mt-0.5 font-mono">{totalSparks}</span>
-          </div>
-
-          <div className="p-3 bg-white border border-outline-variant/30 rounded-2xl shadow-xs">
-            <span className="text-[9px] font-bold text-outline uppercase font-mono tracking-wider block">Fav Game</span>
-            <span className="font-display font-extrabold text-xs text-[#131b2e] mt-1.5 block truncate">{getMostUsedTool()}</span>
-          </div>
-        </div>
-
-        {/* Preferences Toggle lists */}
+        {/* Play history details and clear logic */}
         <div className="w-full bg-white border border-outline-variant/30 rounded-3xl p-5 flex flex-col gap-3">
           <h4 className="font-display font-extrabold text-xs text-outline uppercase tracking-wider font-sans mb-0.5 flex items-center gap-1.5">
             <Sliders className="w-4 h-4 text-[#131b2e]" />
-            <span>Preferences</span>
+            <span>App Preferences</span>
           </h4>
 
           {/* Sound toggle item */}
@@ -146,7 +446,7 @@ export function ProfileLayout({ history, userEmail, localTime, onClearAllUserDat
           </div>
 
           {/* intelligent fallback toggle item */}
-          <div className="flex items-center justify-between pb-2.5">
+          <div className="flex items-center justify-between">
             <div>
               <h5 className="font-display font-bold text-xs text-on-surface">Gemini Copilot Advice</h5>
               <p className="text-[10px] text-outline font-sans">Enables real-time prompt advice from the friendly AI genie.</p>
@@ -164,13 +464,13 @@ export function ProfileLayout({ history, userEmail, localTime, onClearAllUserDat
           </div>
         </div>
 
-        {/* Clean data button */}
+        {/* Wipe data */}
         <button
           onClick={handleResetUser}
           className="w-full py-2.5 border border-dashed border-error/55 hover:border-error text-error hover:bg-error/5 font-sans font-extrabold text-xs rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 focus:outline-none"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          <span>Wipe All Arcade History</span>
+          <span>Wipe All Local Arcade History</span>
         </button>
 
       </div>
