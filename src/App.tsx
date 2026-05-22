@@ -74,6 +74,12 @@ const gameCards = [
   }
 ];
 
+// Smooth and graceful shimmering heartbeat helper
+function getCartoonHeartbeatScale(): number {
+  const t = (Date.now() / 1000) * 2.2; // elegant slow breathing speed
+  return 1.0 + Math.sin(t) * 0.12;
+}
+
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<GameType>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,19 +103,17 @@ export default function App() {
   const dustsRef = React.useRef<{ id: number; x: number; y: number; vx: number; vy: number; size: number; alpha: number; color: string }[]>([]);
   const cardLayoutsRef = React.useRef<{ id: string; cx: number; cy: number; r: number }[]>([]);
 
-  // Calculate coordinates of card icon bubbles inside parent container
+  // Calculate coordinates of card icon bubbles inside viewport
   const updateLayouts = () => {
-    if (!containerRef.current) return;
-    const parentRect = containerRef.current.getBoundingClientRect();
     const layouts = filteredGrid.map((card) => {
       const el = document.getElementById(`dashboard-card-${card.id}`);
       if (el) {
         const rect = el.getBoundingClientRect();
         return {
           id: card.id,
-          cx: rect.left - parentRect.left + rect.width / 2,
-          cy: rect.top - parentRect.top + rect.height / 2,
-          r: Math.max(rect.width / 2, 34), // interaction sphere radius
+          cx: rect.left + rect.width / 2,
+          cy: rect.top + rect.height / 2,
+          r: Math.max(rect.width / 2, 38), // interaction sphere radius
         };
       }
       return null;
@@ -126,20 +130,15 @@ export default function App() {
     }, 300);
 
     window.addEventListener('resize', updateLayouts);
+    window.addEventListener('scroll', updateLayouts, { passive: true });
 
     let animFrameId: number;
     let frameCount = 0;
     const collisionCooldowns: Record<string, number> = {};
 
     const loop = () => {
-      if (!containerRef.current) {
-        animFrameId = requestAnimationFrame(loop);
-        return;
-      }
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const containerWidth = rect.width;
-      const containerHeight = rect.height;
+      const containerWidth = window.innerWidth;
+      const containerHeight = window.innerHeight;
 
       if (containerWidth <= 0 || containerHeight <= 0) {
         animFrameId = requestAnimationFrame(loop);
@@ -148,19 +147,19 @@ export default function App() {
 
       // 1. Gently nudge velocity vector for random continuous drift look
       frameCount++;
-      const driftPower = 0.04;
+      const driftPower = 0.05;
       velRef.current.x += (Math.random() - 0.5) * driftPower;
       velRef.current.y += (Math.random() - 0.5) * driftPower;
 
-      // Periodically add a larger organic redirection to travel active zones
-      if (frameCount % 100 === 0) {
+      // Periodically add larger organic redirections to guarantee traveling active zones
+      if (frameCount % 80 === 0) {
         const angle = Math.random() * Math.PI * 2;
-        velRef.current.x += Math.cos(angle) * 0.35;
-        velRef.current.y += Math.sin(angle) * 0.35;
+        velRef.current.x += Math.cos(angle) * 0.45;
+        velRef.current.y += Math.sin(angle) * 0.45;
       }
 
       // Constrain velocity magnitude to keep it slow, steady, and exciting
-      const SPEED = 1.3;
+      const SPEED = 1.35;
       const mag = Math.sqrt(velRef.current.x * velRef.current.x + velRef.current.y * velRef.current.y);
       if (mag > 0) {
         velRef.current.x = (velRef.current.x / mag) * SPEED;
@@ -171,8 +170,8 @@ export default function App() {
       posRef.current.x += velRef.current.x;
       posRef.current.y += velRef.current.y;
 
-      // Wall reflections with padding relative to container boundaries
-      const pad = 16;
+      // Wall reflections with padding relative to viewport boundaries
+      const pad = 24;
       if (posRef.current.x < pad) {
         posRef.current.x = pad;
         velRef.current.x = Math.abs(velRef.current.x);
@@ -228,16 +227,16 @@ export default function App() {
       }
 
       // Shed sparkling trail / dust particles
-      if (frameCount % 4 === 0) {
-        const colors = ['#fbbf24', '#f59e0b', '#ff56a7', '#ffda79', '#ffffff', '#ffd085'];
+      if (frameCount % 3 === 0) {
+        const colors = ['#fbbf24', '#f59e0b', '#ff56a7', '#ffda79', '#ffffff', '#ffd085', '#06b6d4', '#ec4899'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
         dustsRef.current.push({
           id: Math.random(),
           x: posRef.current.x,
           y: posRef.current.y,
-          vx: (Math.random() - 0.5) * 0.4 - velRef.current.x * 0.2, // blow slightly backward
-          vy: (Math.random() - 0.5) * 0.4 - velRef.current.y * 0.2 + 0.1, // float down slightly
-          size: Math.random() * 4.5 + 2.5,
+          vx: (Math.random() - 0.5) * 0.45 - velRef.current.x * 0.18, // blow backward slightly
+          vy: (Math.random() - 0.5) * 0.45 - velRef.current.y * 0.18 + 0.08, // sink down slightly
+          size: Math.random() * 5 + 3,
           alpha: 1.0,
           color: randomColor,
         });
@@ -249,12 +248,12 @@ export default function App() {
           ...dp,
           x: dp.x + dp.vx,
           y: dp.y + dp.vy,
-          alpha: dp.alpha - 0.024, // fades in ~0.7 seconds
-          size: Math.max(0, dp.size - 0.07),
+          alpha: dp.alpha - 0.022,
+          size: Math.max(0, dp.size - 0.06),
         }))
         .filter(dp => dp.alpha > 0.05 && dp.size > 0.4);
 
-      if (dustsRef.current.length > 40) {
+      if (dustsRef.current.length > 50) {
         dustsRef.current.shift();
       }
 
@@ -268,6 +267,7 @@ export default function App() {
     return () => {
       clearTimeout(timer);
       window.removeEventListener('resize', updateLayouts);
+      window.removeEventListener('scroll', updateLayouts);
       cancelAnimationFrame(animFrameId);
     };
   }, [activeScreen, filteredGrid.length]);
@@ -493,63 +493,86 @@ export default function App() {
               ref={containerRef}
               className="space-y-4 pb-4 transition-opacity duration-300 relative z-10 min-h-[500px]"
             >
-              {/* Spark Dust Particles Trail */}
-              {sparkDust.map((dust) => (
+              {/* FIXED Viewport Soft Spark and Dust Overlay */}
+              <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+                {/* Soft Spark Dust Particles Trail */}
+                {sparkDust.map((dust) => {
+                  const isStar = dust.id % 2 < 1.0;
+                  return (
+                    <div
+                      key={dust.id}
+                      className="absolute pointer-events-none z-40 transition-none"
+                      style={{
+                        left: `${dust.x}px`,
+                        top: `${dust.y}px`,
+                        width: `${dust.size * 1.8}px`,
+                        height: `${dust.size * 1.8}px`,
+                        opacity: dust.alpha * 0.85,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                    >
+                      {isStar ? (
+                        <svg viewBox="0 0 24 24" className="w-full h-full" style={{ color: dust.color }}>
+                          <path
+                            d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      ) : (
+                        <div
+                          className="w-full h-full rounded-full"
+                          style={{
+                            backgroundColor: dust.color,
+                            boxShadow: `0 0 4px ${dust.color}, inset 1px 1px 1px rgba(255,255,255,0.4)`,
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Animated Gorgeous Light Glow Spark */}
                 <div
-                  key={dust.id}
-                  className="absolute rounded-full pointer-events-none z-10"
+                  className="absolute z-50 pointer-events-none flex items-center justify-center transition-none"
                   style={{
-                    left: `${dust.x}px`,
-                    top: `${dust.y}px`,
-                    width: `${dust.size}px`,
-                    height: `${dust.size}px`,
-                    backgroundColor: dust.color,
-                    opacity: dust.alpha,
-                    boxShadow: `0 0 6px ${dust.color}, 0 0 2px #fff`,
-                    transform: 'translate(-50%, -50%)',
-                    transition: 'none',
+                    left: `${sparkPos.x}px`,
+                    top: `${sparkPos.y}px`,
+                    transform: `translate(-50%, -50%) scale(${getCartoonHeartbeatScale().toFixed(3)})`,
+                    width: '42px',
+                    height: '42px',
                   }}
-                />
-              ))}
-
-              {/* Brilliant extra sparky floating spark star */}
-              <div
-                className="absolute z-20 pointer-events-none flex items-center justify-center"
-                style={{
-                  left: `${sparkPos.x}px`,
-                  top: `${sparkPos.y}px`,
-                  transform: 'translate(-50%, -50%)',
-                  width: '36px',
-                  height: '36px',
-                  transition: 'none',
-                }}
-              >
-                {/* Outer warm magic glow ring (non-spooky, friendly gold flare) */}
-                <div className="absolute w-12 h-12 rounded-full bg-amber-400/20 blur-md animate-pulse" />
-                <div className="absolute w-6 h-6 rounded-full bg-yellow-300/30 blur-sm" />
-                
-                {/* Rotating gold outer sparkle star */}
-                <svg
-                  className="w-8 h-8 text-amber-500 animate-spin"
-                  style={{ animationDuration: '3.5s' }}
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
                 >
-                  <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" />
-                </svg>
-                
-                {/* Counter-rotating bright inner star to make it extra sparky */}
-                <svg
-                  className="absolute w-5 h-5 text-white animate-spin"
-                  style={{ animationDuration: '2s', animationDirection: 'reverse' }}
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 4L13.8 10.2L20 12L13.8 13.8L12 20L10.2 13.8L4 12L10.2 10.2L12 4Z" />
-                </svg>
+                  {/* Subtle golden/pastel rose bloom behind spark */}
+                  <div className="absolute w-12 h-12 rounded-full bg-gradient-to-tr from-amber-300/30 to-pink-300/30 blur-md pointer-events-none animate-pulse" />
+                  <div className="absolute w-6 h-6 rounded-full bg-white/60 blur-xs pointer-events-none" />
 
-                {/* Core white-hot glistening sparkle light */}
-                <div className="absolute w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_12px_#ffffff,0_0_4px_#fbbf24]" />
+                  {/* Outer Main Yellow Starburst with elegant drop shadow */}
+                  <svg
+                    className="w-8 h-8 text-amber-300 opacity-95 animate-spin"
+                    style={{ animationDuration: '9s' }}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"
+                      fill="#fcd34d"
+                    />
+                  </svg>
+
+                  {/* Counter-rotating white interior star accent for core glitter */}
+                  <svg
+                    className="absolute w-4.5 h-4.5 text-white opacity-90 animate-spin"
+                    style={{ animationDuration: '4s', animationDirection: 'reverse' }}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M12 4L13.8 10.2L20 12L13.8 13.8L12 20L10.2 13.8L4 12L10.2 10.2L12 4Z"
+                      fill="#ffffff"
+                    />
+                  </svg>
+
+                  {/* Spark core highlight light */}
+                  <div className="absolute w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_#ffffff]" />
+                </div>
               </div>
 
               {/* Cover Banner title with hyper-appealing layout for teens & young at heart */}
