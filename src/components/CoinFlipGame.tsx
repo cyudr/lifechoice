@@ -147,11 +147,14 @@ export function CoinFlipGame({ onSaveDecision }: CoinFlipGameProps) {
         {/* Neon target marker background */}
         <div className="absolute inset-0 border border-dashed border-primary/20 m-4 rounded-2xl pointer-events-none"></div>
 
-        {/* Dynamic 3D perspective wrapper */}
-        <div className="h-36 flex items-center justify-center mb-4 relative [perspective:1000px]">
+        {/* Dynamic 3D perspective wrapper - gently bobbing when idle */}
+        <div className={`h-36 flex items-center justify-center mb-4 relative [perspective:1000px] ${isFlipping ? '' : 'animate-bento-float'}`}>
+          {/* Pulsing neon glowing backplate */}
+          <div className="absolute w-24 h-24 rounded-full bg-gradient-to-tr from-amber-400/25 to-pink-500/15 blur-xl animate-pulse pointer-events-none -z-10" />
+
           {/* Coin structure */}
           <div
-            className="w-28 h-28 rounded-full [transform-style:preserve-3d] select-none cursor-pointer"
+            className="w-28 h-28 rounded-full [transform-style:preserve-3d] select-none cursor-pointer relative z-10"
             style={{
               transform: `rotateX(${rotation}deg)`,
               transition: isFlipping ? 'transform 1.2s cubic-bezier(0.25, 0.8, 0.25, 1)' : 'none',

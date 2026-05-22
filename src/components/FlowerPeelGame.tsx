@@ -245,8 +245,8 @@ export function FlowerPeelGame({ onSaveDecision }: FlowerPeelGameProps) {
           <span>{choiceOutcome ? "The magic daisy has spoken." : gamePhrase}</span>
         </div>
 
-        {/* Flower assembly */}
-        <div className="relative w-36 h-36 flex items-center justify-center">
+        {/* Flower assembly - slow infinite spinning rotation */}
+        <div className="relative w-36 h-36 flex items-center justify-center animate-slow-spin">
           
           {/* Render individual petals */}
           {petals.map((petal) => {

@@ -333,8 +333,8 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
             <div className="absolute bottom-4 left-4 w-5 h-5 border-b-2 border-l-2 border-[#ff7eb3] rounded-bl-sm z-20"></div>
             <div className="absolute bottom-4 right-4 w-5 h-5 border-b-2 border-r-2 border-[#ff7eb3] rounded-br-sm z-20"></div>
 
-            {/* Virtual target grid */}
-            <div className="absolute inset-0 border border-white/5 pointer-events-none flex items-center justify-center z-20">
+            {/* Virtual target grid - spins slow and satisfyingly like a real camera dashboard */}
+            <div className="absolute inset-0 border border-white/5 pointer-events-none flex items-center justify-center z-20 animate-slow-spin">
               <div className="w-40 h-40 border border-dashed border-white/25 rounded-full flex items-center justify-center">
                 <div className="w-20 h-20 border border-dashed border-white/20 rounded-full"></div>
               </div>
