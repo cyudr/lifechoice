@@ -55,7 +55,7 @@ export function ProfileLayout({
   const [smartHelpEnabled, setSmartHelpEnabled] = useState(true);
 
   // Local state for profile inputs
-  const [editWalletEmail, setEditWalletEmail] = useState(walletProfile?.walletEmail || 'cyudreamz@gmail.com');
+  const [editWalletEmail, setEditWalletEmail] = useState(walletProfile?.walletEmail || 'guest@arcade.local');
   const [editPublisherId, setEditPublisherId] = useState(walletProfile?.publisherId || 'ca-pub-xaxnsazkrnwvzdrfbrsk');
   const [editAdSlotId, setEditAdSlotId] = useState(walletProfile?.adSlotId || '1092837482');
 
@@ -258,7 +258,7 @@ export function ProfileLayout({
                     required
                     disabled={authLoading}
                     className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-indigo-400 font-sans"
-                    placeholder="Enter email e.g. cyudreamz@gmail.com"
+                    placeholder="Enter email e.g. you@example.com"
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                   />

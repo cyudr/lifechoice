@@ -20,7 +20,7 @@ export interface UserWalletProfile {
 
 // Default state fallback
 export const DEFAULT_PROFILE: Omit<UserWalletProfile, 'userId' | 'isAnonymous'> = {
-  walletEmail: 'cyudreamz@gmail.com', // fallback default from additional metadata
+  walletEmail: 'guest@arcade.local', // fallback default
   publisherId: 'ca-pub-8369709738621970', // Provided by user
   adSlotId: '1092837482',
   balance: 0.00,
@@ -149,7 +149,7 @@ export const SUPABASE_SQL_CREATION_SNIPPET = `-- RUN THIS CODE IN YOUR SUPABASE 
 create table if not exists public.user_ad_revenue (
     user_id text primary key,
     is_anonymous boolean default true,
-    wallet_email text default 'cyudreamz@gmail.com',
+    wallet_email text default 'guest@arcade.local',
     publisher_id text default 'ca-pub-8369709738621970',
     ad_slot_id text default '1092837482',
     balance numeric(10, 4) default 0.0000,

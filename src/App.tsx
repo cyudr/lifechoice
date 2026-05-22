@@ -126,7 +126,7 @@ export default function App() {
   const [walletProfile, setWalletProfile] = useState<UserWalletProfile>({
     userId: 'guest-local-' + Math.random().toString(36).substring(2, 9),
     isAnonymous: true,
-    walletEmail: 'cyudreamz@gmail.com',
+    walletEmail: 'guest@arcade.local',
     publisherId: 'ca-pub-8369709738621970',
     adSlotId: '1092837482',
     balance: 0.00,
@@ -423,7 +423,7 @@ export default function App() {
         const newProf: UserWalletProfile = {
           userId,
           isAnonymous: isAnon,
-          walletEmail: email || 'cyudreamz@gmail.com',
+          walletEmail: email || 'guest@arcade.local',
           publisherId: 'ca-pub-8369709738621970',
           adSlotId: '1092837482',
           balance: 0.00,
@@ -524,7 +524,7 @@ export default function App() {
             setWalletProfile({
               userId: localUserId,
               isAnonymous: true,
-              walletEmail: 'cyudreamz@gmail.com',
+              walletEmail: 'guest@arcade.local',
               publisherId: 'ca-pub-8369709738621970',
               adSlotId: '1092837482',
               balance: 0.00,
