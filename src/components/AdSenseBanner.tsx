@@ -78,18 +78,15 @@ export function AdSenseBanner({ walletProfile, onAddRevenue }: AdSenseBannerProp
         {/* AdSense Verification Header */}
         <div className="flex items-center justify-between text-[10px] text-slate-400 mb-4 pb-2.5 border-b border-slate-100">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-            <span className="font-extrabold uppercase tracking-wider text-indigo-950 font-sans">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-extrabold uppercase tracking-wider text-slate-700 font-sans">
               Google AdSense Live Unit
             </span>
           </div>
-          <span className="font-mono bg-slate-50 text-slate-500 px-2 py-0.5 rounded border border-slate-100">
-            {pubId}
-          </span>
         </div>
 
         {/* Ad Placement Mounting Frame */}
-        <div className="w-full overflow-hidden flex flex-col items-center justify-center min-h-[95px] rounded-2xl relative bg-radial from-slate-50 to-white/10 p-3">
+        <div className="w-full overflow-hidden flex flex-col items-center justify-center min-h-[100px] rounded-2xl relative bg-slate-50 p-1 border border-slate-100">
           {loadedFromClient && (
             <ins 
               className="adsbygoogle"

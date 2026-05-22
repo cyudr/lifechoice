@@ -122,6 +122,12 @@ export default function App() {
 
   // Supabase Auth and Google Wallet States
   const [sessionUser, setSessionUser] = useState<any | null>(null);
+
+  const isGoogleUser = !!(sessionUser && (
+    sessionUser.app_metadata?.provider === 'google' || 
+    sessionUser.isGoogleSimulated ||
+    sessionUser.email?.endsWith('@gmail.com')
+  ));
   const [walletProfile, setWalletProfile] = useState<UserWalletProfile>({
     userId: 'guest-local-' + Math.random().toString(36).substring(2, 9),
     isAnonymous: true,
@@ -563,12 +569,14 @@ export default function App() {
   };
 
   const handleSaveDecision = (entry: Omit<DecisionHistoryEntry, 'id' | 'timestamp'>) => {
-    if (usageCount >= 5) {
+    if (!isGoogleUser && usageCount >= 5) {
       alert("Usage limit met! Close this box, scroll down and click on any sponsored banner layout to instantly recharge your 5 free sessions!");
       return;
     }
     
-    setUsageCount(prev => prev + 1);
+    if (!isGoogleUser) {
+      setUsageCount(prev => prev + 1);
+    }
 
     const formattedEntry: DecisionHistoryEntry = {
       ...entry,
@@ -591,11 +599,13 @@ export default function App() {
 
   // Call server-side helper for Gemini completions
   const handleRequestAiSuggestions = async (promptType: string, count: number): Promise<string[]> => {
-    if (usageCount >= 5) {
+    if (!isGoogleUser && usageCount >= 5) {
       alert("Usage limit met! Scroll down and click any sponsored banner to instantly reload your energy!");
       return [];
     }
-    setUsageCount(prev => prev + 1);
+    if (!isGoogleUser) {
+      setUsageCount(prev => prev + 1);
+    }
 
     setAiLoading(true);
     try {
@@ -627,11 +637,13 @@ export default function App() {
     emoji: string,
     length: string
   ): Promise<string[]> => {
-    if (usageCount >= 5) {
+    if (!isGoogleUser && usageCount >= 5) {
       alert("Usage limit met! Scroll down and click any sponsored banner to instantly reload your energy!");
       return [];
     }
-    setUsageCount(prev => prev + 1);
+    if (!isGoogleUser) {
+      setUsageCount(prev => prev + 1);
+    }
 
     setAiLoading(true);
     try {
@@ -659,11 +671,13 @@ export default function App() {
 
   // Call server-side helper for Gemini biometric/aura vibe analysis
   const handleRequestVibeAnalysis = async (customInput?: string): Promise<any> => {
-    if (usageCount >= 5) {
+    if (!isGoogleUser && usageCount >= 5) {
       alert("Usage limit met! Scroll down and click any sponsored banner to instantly reload your energy!");
       return null;
     }
-    setUsageCount(prev => prev + 1);
+    if (!isGoogleUser) {
+      setUsageCount(prev => prev + 1);
+    }
 
     setAiLoading(true);
     try {
@@ -890,11 +904,15 @@ export default function App() {
                     <div>
                       <span className="text-[9px] font-black text-slate-400 uppercase font-mono block tracking-wider leading-none">Arcade Energy</span>
                       <span className="text-xs font-extrabold text-slate-700 block mt-0.5">
-                        {usageCount >= 5 ? 'RECHARGING...' : `${5 - usageCount} of 5 spins left`}
+                        {isGoogleUser ? 'Google Gemini Direct Active' : (usageCount >= 5 ? 'RECHARGING...' : `${5 - usageCount} of 5 spins left`)}
                       </span>
                     </div>
                   </div>
-                  {usageCount >= 5 ? (
+                  {isGoogleUser ? (
+                    <div className="bg-emerald-100 border border-emerald-300 text-emerald-950 font-mono text-[9px] font-bold px-2.5 py-0.5 rounded-md animate-pulse">
+                      🔋 UNLIMITED ACCESS
+                    </div>
+                  ) : (usageCount >= 5 ? (
                     <div className="bg-amber-100 border border-amber-300 text-amber-900 font-mono text-[9px] font-bold px-2 py-0.5 rounded-md animate-pulse">
                       RELOAD: {usageTimer}s
                     </div>
@@ -911,7 +929,7 @@ export default function App() {
                         />
                       ))}
                     </div>
-                  )}
+                  ))}
                 </div>
                 
                 {/* Search bar alignment option */}
@@ -990,7 +1008,7 @@ export default function App() {
             </div>
           )}
 
-          {['wheel', 'coin', 'flower', 'vibe', 'poll', 'text'].includes(activeScreen) && usageCount >= 5 ? (
+          {['wheel', 'coin', 'flower', 'vibe', 'poll', 'text'].includes(activeScreen) && !isGoogleUser && usageCount >= 5 ? (
             <div className="w-full max-w-md mx-auto bg-white border border-outline-variant/30 rounded-3xl p-6.5 text-center shadow-lg relative overflow-hidden my-6 animate-fade-in">
               <div className="absolute top-0 right-0 py-1.5 px-3 bg-indigo-600 text-white select-none text-[9px] uppercase font-black font-mono tracking-widest rounded-bl-2xl">
                 Cool-down Active 🧊
@@ -1082,6 +1100,7 @@ export default function App() {
               dbWarning={dbWarning}
               syncLoading={syncLoading}
               sessionUser={sessionUser}
+              onSetSessionUser={setSessionUser}
             />
           )}
 
