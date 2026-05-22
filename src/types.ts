@@ -7,7 +7,8 @@ export type GameType =
   | 'vibe'
   | 'text'
   | 'history'
-  | 'profile';
+  | 'profile'
+  | 'tribe';
 
 export interface DecisionHistoryEntry {
   id: string;

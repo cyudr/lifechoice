@@ -26,6 +26,7 @@ import { LunchPollGame } from './components/LunchPollGame';
 import { TextTellGame } from './components/TextTellGame';
 import { HistoryPanel } from './components/HistoryPanel';
 import { ProfileLayout } from './components/ProfileLayout';
+import { TribeForum } from './components/TribeForum';
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<GameType>('dashboard');
@@ -252,6 +253,17 @@ export default function App() {
             <span>Playground</span>
           </button>
           <button
+            onClick={() => setActiveScreen('tribe')}
+            className={`flex items-center gap-1 font-sans font-extrabold text-xs py-1.5 px-3 rounded-xl transition-all ${
+              activeScreen === 'tribe' 
+                ? 'bg-primary-container/10 text-primary' 
+                : 'text-outline hover:text-on-surface'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Tribe</span>
+          </button>
+          <button
             onClick={() => setActiveScreen('history')}
             className={`flex items-center gap-1 font-sans font-extrabold text-xs py-1.5 px-3 rounded-xl transition-all ${
               activeScreen === 'history' 
@@ -404,6 +416,10 @@ export default function App() {
               onClearAllUserData={handleClearAllUserData}
             />
           )}
+
+          {activeScreen === 'tribe' && (
+            <TribeForum />
+          )}
         </div>
 
         {/* Dynamic Ad Placement Block at footer bottom */}
@@ -415,11 +431,11 @@ export default function App() {
       </main>
 
       {/* Persistent Bottom Nav Menu from JSON (Mobile viewports only) */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center py-2.5 px-4 bg-white/80 border-t border-outline-variant/20 z-50 backdrop-blur-md shadow-[0px_-4px_20px_rgba(15,23,42,0.04)]">
+      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center py-2.5 px-2 bg-white/80 border-t border-outline-variant/20 z-50 backdrop-blur-md shadow-[0px_-4px_20px_rgba(15,23,42,0.04)]">
         <button
           onClick={() => setActiveScreen('dashboard')}
-          className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
-            activeScreen === 'dashboard' || (activeScreen !== 'history' && activeScreen !== 'profile')
+          className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
+            activeScreen === 'dashboard' || (activeScreen !== 'history' && activeScreen !== 'profile' && activeScreen !== 'tribe')
               ? 'bg-primary/10 text-primary'
               : 'text-outline hover:text-on-surface'
           }`}
@@ -429,8 +445,20 @@ export default function App() {
         </button>
 
         <button
+          onClick={() => setActiveScreen('tribe')}
+          className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
+            activeScreen === 'tribe'
+              ? 'bg-primary/10 text-primary'
+              : 'text-outline hover:text-on-surface'
+          }`}
+        >
+          <Users className="w-5 h-5" />
+          <span className="font-sans font-bold text-[10px] mt-0.5">Tribe</span>
+        </button>
+
+        <button
           onClick={() => setActiveScreen('history')}
-          className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
+          className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
             activeScreen === 'history'
               ? 'bg-primary/10 text-primary'
               : 'text-outline hover:text-on-surface'
@@ -442,7 +470,7 @@ export default function App() {
 
         <button
           onClick={() => setActiveScreen('profile')}
-          className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
+          className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
             activeScreen === 'profile'
               ? 'bg-primary/10 text-primary'
               : 'text-outline hover:text-on-surface'
