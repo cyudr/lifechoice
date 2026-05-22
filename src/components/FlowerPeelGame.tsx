@@ -250,40 +250,81 @@ export function FlowerPeelGame({ onSaveDecision }: FlowerPeelGameProps) {
           
           {/* Render individual petals */}
           {petals.map((petal) => {
+            const petalColors = [
+              { from: '#ffd8e2', to: '#fff1f4', border: '#fda4af' }, // Soft Rose
+              { from: '#fae8ff', to: '#fdf4ff', border: '#f0abfc' }, // Pastel Orchid/Lilac
+              { from: '#ffedd5', to: '#fff7ed', border: '#fed7aa' }, // Sunny Peach
+              { from: '#fef9c3', to: '#fefef2', border: '#fef08a' }, // Soft Sun Bloom
+              { from: '#e0e7ff', to: '#f5f7ff', border: '#c7d2fe' }, // Baby blue
+              { from: '#ccfbf1', to: '#f0fdfa', border: '#99f6e4' }, // Pastel foam green
+              { from: '#ffdbe8', to: '#ffeff5', border: '#fda4af' }  // Pink Blossom
+            ];
+            const color = petalColors[petal.id % petalColors.length];
+
             return (
               <div
                 key={petal.id}
                 onClick={() => handlePeelPetal(petal.id)}
-                className={`absolute origin-bottom transition-all duration-500 ease-out cursor-pointer hover:brightness-105 active:scale-95`}
+                className="absolute origin-bottom transition-all duration-700 ease-out cursor-pointer select-none"
                 style={{
-                  height: '65px',
-                  width: '26px',
+                  height: '95px',
+                  width: '38px',
                   left: '50%',
                   bottom: '50%',
                   transformOrigin: '50% 100%',
                   transform: `translateX(-50%) rotate(${petal.angle}deg) ${
-                    petal.peeled ? 'translateY(-150px) rotate(45deg) scale(0)' : 'translateY(0) scale(1)'
+                    petal.peeled ? 'translateY(-170px) rotate(48deg) scale(0)' : 'translateY(0) scale(1)'
                   }`,
                   opacity: petal.peeled ? 0 : 1,
                   pointerEvents: petal.peeled ? 'none' : 'auto',
                 }}
               >
-                {/* 3D simulated white Daisy petal */}
-                <div 
-                  className="w-full h-[90%] bg-gradient-to-b from-[#FFFbF2] via-white to-neutral-100 rounded-full border border-neutral-200/40 shadow-xs relative overflow-hidden"
-                  style={{
-                    boxShadow: 'inset 0 3px 5px rgba(255, 255, 255, 0.4), 0 1.5px 3px rgba(0, 0, 0, 0.05)',
-                  }}
+                {/* Visual SVG of a highly flowery, handdrawn organic petal */}
+                <svg
+                  viewBox="0 0 100 240"
+                  className="w-full h-full drop-shadow-[0_4px_6px_rgba(139,92,26,0.06)] hover:scale-105 duration-200"
                 >
-                  <div className="absolute top-1 left-1/2 -translate-x-1/2 w-0.5 h-[60%] bg-neutral-200/50 rounded-full"></div>
-                </div>
+                  {/* Organic floral petal body shape */}
+                  <path
+                    d="M 50 240 C 18 180, 2 110, 8 50 C 12 15, 36 6, 50 18 C 64 6, 88 15, 92 50 C 98 110, 82 180, 50 240 Z"
+                    fill={`url(#gp-gradient-${petal.id})`}
+                    stroke={color.border}
+                    strokeWidth="3.5"
+                    strokeLinejoin="round"
+                  />
+                  {/* Delicate petal lines / veins */}
+                  <path
+                    d="M 50 215 Q 50 115 50 35 M 50 165 Q 32 135 25 115 M 50 145 Q 68 115 75 95 M 50 105 Q 35 85 28 70 M 50 85 Q 65 67 72 52"
+                    fill="none"
+                    stroke={color.border}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="1 1"
+                    className="opacity-75"
+                  />
+                  
+                  {/* Define radial/linear gradient on local SVG definitions */}
+                  <defs>
+                    <linearGradient id={`gp-gradient-${petal.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor={color.to} />
+                      <stop offset="100%" stopColor={color.from} />
+                    </linearGradient>
+                  </defs>
+                </svg>
               </div>
             );
           })}
 
-          {/* Yellow Center Hub representing Daisy center */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 bg-gradient-to-br from-amber-300 via-amber-400 to-yellow-500 rounded-full z-10 shadow-md border-2 border-white flex items-center justify-center">
-            <div className="w-5 h-5 bg-amber-500/10 rounded-full border border-amber-600/10 animate-ping"></div>
+          {/* Handdrawn happy smiley Center Hub representing Daisy center */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-13 h-13 bg-gradient-to-tr from-amber-300 via-amber-400 to-yellow-300 rounded-[50%_52%_48%_50%] z-10 shadow-[0_4px_10px_rgba(217,119,6,0.18)] border-3 border-amber-700/50 flex items-center justify-center">
+            <svg viewBox="0 0 40 40" className="w-8 h-8 opacity-60">
+              <circle cx="20" cy="20" r="14" fill="none" stroke="#78350f" strokeWidth="2" strokeDasharray="3 3" />
+              <circle cx="20" cy="20" r="8" fill="none" stroke="#78350f" strokeWidth="1.5" strokeDasharray="2 2" />
+              <circle cx="16" cy="18" r="1.5" fill="#78350f" />
+              <circle cx="24" cy="18" r="1.5" fill="#78350f" />
+              <path d="M 17 23 Q 20 26 23 23" fill="none" stroke="#78350f" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           </div>
         </div>
       </div>
