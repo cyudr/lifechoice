@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { DiscussionEmbed } from 'disqus-react';
 import { 
   MessageSquare, 
   Sparkles, 
@@ -16,6 +15,61 @@ interface Topic {
   desc: string;
   icon: React.ReactNode;
   url: string;
+}
+
+interface DisqusConfig {
+  url: string;
+  identifier: string;
+  title: string;
+  language?: string;
+}
+
+// React 19-optimized functional component replacing the outdated legacy class-based 'disqus-react' package
+export function DiscussionEmbed({ shortname, config }: { shortname: string; config: DisqusConfig }) {
+  useEffect(() => {
+    // 1. Setup the global disqus config callback required by Disqus embed script
+    (window as any).disqus_config = function (this: any) {
+      this.page.url = config.url;
+      this.page.identifier = config.identifier;
+      this.page.title = config.title;
+      if (config.language) {
+        this.language = config.language;
+      }
+    };
+
+    // 2. If Disqus is already initialized on the page, trigger standard SPA reset
+    if (typeof (window as any).DISQUS !== 'undefined') {
+      try {
+        (window as any).DISQUS.reset({
+          reload: true,
+          config: function (this: any) {
+            this.page.url = config.url;
+            this.page.identifier = config.identifier;
+            this.page.title = config.title;
+            if (config.language) {
+              this.language = config.language;
+            }
+          }
+        });
+      } catch (err) {
+        console.warn("Disqus reset exception safely bypassed:", err);
+      }
+    } else {
+      // 3. Otherwise, fetch and inject the thread iframe loader script dynamically
+      const scriptId = 'disqus-embed-script';
+      let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+      if (!script) {
+        script = document.createElement('script');
+        script.id = scriptId;
+        script.src = `https://${shortname}.disqus.com/embed.js`;
+        script.setAttribute('data-timestamp', String(Date.now()));
+        script.async = true;
+        document.body.appendChild(script);
+      }
+    }
+  }, [shortname, config.url, config.identifier, config.title, config.language]);
+
+  return <div id="disqus_thread" className="w-full min-h-[350px]" />;
 }
 
 // React Error Boundary to safely isolate Disqus's potential cross-origin iframe or browser shield restrictions

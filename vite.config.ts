@@ -16,8 +16,7 @@ export default defineConfig(() => {
         'react',
         'react-dom',
         'lucide-react',
-        'motion',
-        'disqus-react'
+        'motion'
       ]
     },
     server: {
