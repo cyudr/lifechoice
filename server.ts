@@ -31,6 +31,12 @@ function getAiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
+// Resilient verification endpoints for Google AdSense Crawler access
+app.get('/ads.txt', (req, res) => {
+  res.type('text/plain');
+  res.send('google.com, pub-8369709738621970, DIRECT, f08c47fec0942fa0');
+});
+
 // REST API route for options generation (e.g. food, generic choices)
 app.post('/api/gemini/options', async (req, res) => {
   const { promptType, count } = req.body;
