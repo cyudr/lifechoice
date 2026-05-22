@@ -1,6 +1,6 @@
 {
-  "name": "Choice Maker",
-  "description": "Create custom polls, randomize daily decisions, spin the wheel, flip coins, roll dice, and consult the AI choice generator.",
-  "requestFramePermissions": [],
+  "name": "Spark Arcade",
+  "description": "An interactive, multi-tool playground with custom spin wheels, coin flips, magic flower peeling, and AI chat sparkers.",
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

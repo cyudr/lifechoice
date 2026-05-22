@@ -1,134 +1,144 @@
-import express from "express";
-import path from "path";
-import dotenv from "dotenv";
-import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
+import express from 'express';
+import path from 'path';
+import dotenv from 'dotenv';
+import { createServer as createViteServer } from 'vite';
+import { GoogleGenAI, Type } from '@google/genai';
 
 dotenv.config();
 
 const app = express();
-app.use(express.json());
-
 const PORT = 3000;
 
-const apiKey = process.env.GEMINI_API_KEY;
+app.use(express.json());
 
-let ai: GoogleGenAI | null = null;
-if (apiKey) {
-  ai = new GoogleGenAI({
-    apiKey: apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': "aistudio-build",
-      },
-    },
-  });
+// Initialize Gemini SDK lazily to avoid crash if API key is not yet set
+let aiClient: GoogleGenAI | null = null;
+
+function getAiClient(): GoogleGenAI | null {
+  if (!aiClient) {
+    const key = process.env.GEMINI_API_KEY;
+    if (key && key !== 'MY_GEMINI_API_KEY' && key.trim() !== '') {
+      aiClient = new GoogleGenAI({
+        apiKey: key,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+    }
+  }
+  return aiClient;
 }
 
-// API Route for Gemini suggestions on category choices
-app.post("/api/suggest-options", async (req, res) => {
+// REST API route for options generation (e.g. food, generic choices)
+app.post('/api/gemini/options', async (req, res) => {
+  const { promptType, count } = req.body;
+  const numCount = count ? parseInt(count) : 5;
+
+  const client = getAiClient();
+  if (!client) {
+    // If no client available, return standard options fallback instantly
+    return res.json({
+      options: [
+        'Grab Tacos 🌮',
+        'Order Sushi 🍣',
+        'Have Burgers 🍔5',
+        'Cook Italian 🍝',
+        'Green Salad 🥗'
+      ]
+    });
+  }
+
   try {
-    const { category } = req.body;
-    if (!category) {
-      res.status(400).json({ error: "Category is required." });
-      return;
-    }
+    const systemPrompt = `You are a helpful, casual companion specializing in defeating decision paralysis. Provide exactly ${numCount} unique, interesting, and playful options for ${promptType}. Keep them extremely short (max 4-5 words each), include a cute matching emoji in each! Avoid kiddy or overly silly options, keep it casual and high choice value. Always respond in valid JSON format according to the output schema.`;
 
-    if (!ai) {
-      res.status(503).json({
-        error: "Gemini API key is not configured. Go to Settings > Secrets in AI Studio to set GEMINI_API_KEY."
-      });
-      return;
-    }
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: `You are a helpful and creative decision-making assistant. Generate a catchy, creative title and an array of 4 to 8 unique, realistic, and highly distinct choices for a user trying to decide about: "${category}". Keep options distinct and short (under 24 characters).`,
+    const response = await client.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: `Provide ${numCount} options for: ${promptType}`,
       config: {
-        responseMimeType: "application/json",
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
-          required: ["title", "options"],
           properties: {
-            title: {
-              type: Type.STRING,
-              description: "A fun and catchy title for this decision category.",
-            },
             options: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "4 to 8 distinct choices/options for the decision.",
-            },
+              description: 'List of clean casual options.'
+            }
           },
-        },
-      },
+          required: ['options']
+        }
+      }
     });
 
-    const text = response.text;
-    if (!text) {
-      throw new Error("Empty response from AI.");
-    }
-
-    const data = JSON.parse(text.trim());
-    res.json(data);
+    const jsonText = response.text || '';
+    const parsed = JSON.parse(jsonText.trim());
+    res.json(parsed);
   } catch (error: any) {
-    console.error("AI Generation failed:", error);
-    res.status(500).json({ error: error.message || "Failed to generate recommendations with AI." });
+    console.error('Gemini options error', error);
+    res.status(500).json({ error: 'Completions failed', options: ['Order Pizza 🍕', 'Make Salads 🥗'] });
   }
 });
 
-// API Route for Gemini Smart 8-Ball Oracle Answers
-app.post("/api/magic8-ask", async (req, res) => {
+// REST API route for text composition replies
+app.post('/api/gemini/texts', async (req, res) => {
+  const { scenario, tone } = req.body;
+
+  const client = getAiClient();
+  if (!client) {
+    return res.json({
+      texts: [
+        "Hey! Wish I could make it but I'm completely wiped out. Enjoy! 😴",
+        "Really wish I could go but I have to catch up on sleep tonight. Let's hang soon!",
+        "Low battery alert! Tucking myself in with hot herbal tea. Have massive fun! 🔋"
+      ]
+    });
+  }
+
   try {
-    const { question } = req.body;
-    if (!question) {
-      res.status(400).json({ error: "Question is required." });
-      return;
-    }
+    const systemPrompt = `You are a direct, witty reply companion helping overthinkers write quick reply texts. For the given description scenario, generate exactly 3 alternative brief reply texts.
+- Suggestion 1 should be a warm, casual reply.
+- Suggestion 2 should be a direct, professional, clear reply.
+- Suggestion 3 should be a very funny, lighthearted reply.
+Keep them short, relatable, with zero awkward structures. Response MUST be in JSON array of strings under "texts" property.`;
 
-    if (!ai) {
-      res.status(503).json({
-        error: "Gemini API key is not configured."
-      });
-      return;
-    }
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: `You are the mystical, witty, and clever Magic 8-Ball Oracle. Provide a short, captivating yes/no style answer (exactly 1 sentence, under 10 words) responding to this question: "${question}". Be creative, slightly sassy, philosophical, or deeply cosmic, and format the output inside the requested JSON 'answer' schema.`,
+    const response = await client.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: `Scenario situation: ${scenario}`,
       config: {
-        responseMimeType: "application/json",
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
-          required: ["answer"],
           properties: {
-            answer: {
-              type: Type.STRING,
-              description: "A short, witty, yes/no oriented oracle response under 10 words.",
-            },
+            texts: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: 'The three suggested direct texts.'
+            }
           },
-        },
-      },
+          required: ['texts']
+        }
+      }
     });
 
-    const text = response.text;
-    if (!text) {
-      throw new Error("No response from AI Oracle.");
-    }
-
-    const data = JSON.parse(text.trim());
-    res.json(data);
+    const jsonText = response.text || '';
+    const parsed = JSON.parse(jsonText.trim());
+    res.json(parsed);
   } catch (error: any) {
-    console.error("Oracle AI failed:", error);
-    res.status(500).json({ error: error.message || "Celestial paths are blocked." });
+    console.error('Gemini text error', error);
+    res.status(500).json({ error: 'Text composition failed' });
   }
 });
 
+// Serve frontend based on Node environment
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
@@ -139,8 +149,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Decision Studio running on http://0.0.0.0:${PORT}`);
   });
 }
 
