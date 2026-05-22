@@ -64,9 +64,20 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
   const [vibeResult, setVibeResult] = useState<VibeResult>(CONSTANT_VIBES[0]);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [isIframe, setIsIframe] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    try {
+      if (window.self !== window.top) {
+        setIsIframe(true);
+      }
+    } catch (e) {
+      setIsIframe(true);
+    }
+  }, []);
 
   // Initialize camera
   const startCamera = async () => {
@@ -81,41 +92,72 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
 
         let stream: MediaStream;
         try {
-          // Attempt using standard, mobile-friendly 'ideal' properties rather than fixed constraints.
-          // This avoids the OverconstrainedError (TypeError) commonly seen on iOS and Android Chrome.
+          // Attempt standard mobile facingMode with preferred size using ideal constraints
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
-              facingMode: facingMode,
-              width: { ideal: 645 },
-              height: { ideal: 485 }
+              facingMode: { ideal: facingMode },
+              width: { ideal: 640 },
+              height: { ideal: 480 }
             }
           });
         } catch (overconstrainedErr) {
-          console.warn("Retrying with minimal constraints fallback", overconstrainedErr);
-          // Standard fallback to prevent errors on strict-constraint browsers
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: facingMode }
-          });
-        }
-
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          // Android and iOS Chrome/Safari require explicit .play() trigger to resolve H.264 video block states
-          const playPromise = videoRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(e => {
-              console.warn("Webcam autoplay playPromise catch: play was interrupted or requires interaction", e);
+          try {
+            // Secondary fallback with only facingMode constraints
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: facingMode } }
+            });
+          } catch (fallback2) {
+            // Standard general fallback to prevent overconstrained issues on older mobile chipsets
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: true
             });
           }
         }
-        setStreamActive(true);
+
+        streamRef.current = stream;
+
+        // Keep attempting to bind the stream to the video tag if React's ref isn't immediately mounted.
+        const attachStreamToVideo = (attempts = 0) => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            
+            // Wait for metadata load
+            videoRef.current.onloadedmetadata = () => {
+              if (videoRef.current) {
+                videoRef.current.play()
+                  .then(() => {
+                    setStreamActive(true);
+                  })
+                  .catch(e => {
+                    console.warn("Autoplay interrupted or needs touch interaction", e);
+                    // Force state active so they still see the camera feed once interacted
+                    setStreamActive(true);
+                  });
+              }
+            };
+            
+            // Safeguard play for already loaded metadata
+            if (videoRef.current.readyState >= 1) { // HAVE_METADATA or more
+              videoRef.current.play()
+                .then(() => setStreamActive(true))
+                .catch(() => setStreamActive(true));
+            }
+          } else if (attempts < 10) {
+            // Retry binding stream to video element
+            setTimeout(() => attachStreamToVideo(attempts + 1), 100);
+          } else {
+            // Fallback if video tag is missing
+            setCameraError("Webcam viewport target not loaded. Try hitting 'Retry Camera Activation'.");
+          }
+        };
+
+        attachStreamToVideo();
       } else {
         setCameraError("Camera capture interface not supported on this browser.");
       }
     } catch (err: any) {
       console.error("Camera access failed", err);
-      setCameraError("Webcam access declined or currently busy. Please verify permissions in your mobile address bar, or utilize 'Random Card'!");
+      setCameraError("Webcam access blocked or busy. If you are on an iPhone or Android device, look for the 'Lock/Camera' icon in your browser's url bar to grant camera permission.");
     }
   };
 
@@ -270,35 +312,35 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
           {/* Facial alignment camera viewport */}
           <div className="relative w-60 h-60 rounded-2xl overflow-hidden bg-neutral-900 flex items-center justify-center border-2 border-primary/20 mb-4">
             
-            {streamActive ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
-              />
-            ) : (
-              <div className="text-center px-4">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${!streamActive ? 'hidden' : ''} ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+            />
+
+            {!streamActive && (
+              <div className="text-center px-4 absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 z-10">
                 <p className="text-[10px] text-neutral-400 font-sans mb-1">Webcam initializing...</p>
-                <div className="w-8 h-8 border-2 border-t-primary border-neutral-700 rounded-full animate-spin mx-auto"></div>
+                <div className="w-8 h-8 border-2 border-t-[#ff7eb3] border-neutral-700 rounded-full animate-spin mx-auto"></div>
               </div>
             )}
 
             {/* Glowing UI Corner Frames */}
-            <div className="absolute top-4 left-4 w-5 h-5 border-t-2 border-l-2 border-[#ff7eb3] rounded-tl-sm"></div>
-            <div className="absolute top-4 right-4 w-5 h-5 border-t-2 border-r-2 border-[#ff7eb3] rounded-tr-sm"></div>
-            <div className="absolute bottom-4 left-4 w-5 h-5 border-b-2 border-l-2 border-[#ff7eb3] rounded-bl-sm"></div>
-            <div className="absolute bottom-4 right-4 w-5 h-5 border-b-2 border-r-2 border-[#ff7eb3] rounded-br-sm"></div>
+            <div className="absolute top-4 left-4 w-5 h-5 border-t-2 border-l-2 border-[#ff7eb3] rounded-tl-sm z-20"></div>
+            <div className="absolute top-4 right-4 w-5 h-5 border-t-2 border-r-2 border-[#ff7eb3] rounded-tr-sm z-20"></div>
+            <div className="absolute bottom-4 left-4 w-5 h-5 border-b-2 border-l-2 border-[#ff7eb3] rounded-bl-sm z-20"></div>
+            <div className="absolute bottom-4 right-4 w-5 h-5 border-b-2 border-r-2 border-[#ff7eb3] rounded-br-sm z-20"></div>
 
             {/* Virtual target grid */}
-            <div className="absolute inset-0 border border-white/5 pointer-events-none flex items-center justify-center">
+            <div className="absolute inset-0 border border-white/5 pointer-events-none flex items-center justify-center z-20">
               <div className="w-40 h-40 border border-dashed border-white/25 rounded-full flex items-center justify-center">
                 <div className="w-20 h-20 border border-dashed border-white/20 rounded-full"></div>
               </div>
             </div>
 
-            <div className="absolute top-2.5 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-bold text-white uppercase tracking-wider whitespace-nowrap z-10">
+            <div className="absolute top-2.5 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-bold text-white uppercase tracking-wider whitespace-nowrap z-30">
               Position your smiling face!
             </div>
 
@@ -309,7 +351,7 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
                   e.stopPropagation();
                   setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
                 }}
-                className="absolute bottom-2.5 right-2.5 bg-black/75 hover:bg-black w-8 h-8 rounded-full flex items-center justify-center border border-white/10 shadow-md transition-all active:scale-95 z-10 cursor-pointer"
+                className="absolute bottom-2.5 right-2.5 bg-black/75 hover:bg-black w-8 h-8 rounded-full flex items-center justify-center border border-white/10 shadow-md transition-all active:scale-95 z-30 cursor-pointer"
                 title="Switch Camera (Front/Rear)"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-[#ff7eb3]" />
@@ -350,6 +392,21 @@ export function VibeCheckGame({ onSaveDecision, onRequestVibe, isAiLoading }: Vi
                 <RefreshCw className="w-2.5 h-2.5" />
                 <span>Retry Camera Activation</span>
               </button>
+            </div>
+          )}
+
+          {isIframe && (
+            <div className="mt-3 p-3 bg-amber-50/90 border border-amber-200/50 rounded-xl flex flex-col gap-1.5 text-[10px] text-amber-900 leading-tight w-full">
+              <p className="font-semibold text-amber-950">Mobile device camera blocked?</p>
+              <p>For your security, mobile browsers restrict webcam access inside nested app-previews. Tap below to launch Spark Arcade in a direct tab, where your camera works instantly!</p>
+              <a
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="self-center mt-1 bg-amber-600 hover:bg-amber-700 text-white font-sans font-bold text-[9px] px-3 py-1.5 rounded-lg transition-transform active:scale-95 uppercase tracking-wide cursor-pointer flex items-center gap-1 text-center no-underline hover:text-white"
+              >
+                <span>Launch in Direct Tab 🚀</span>
+              </a>
             </div>
           )}
 
