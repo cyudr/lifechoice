@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DiscussionEmbed } from 'disqus-react';
 import { 
   MessageSquare, 
@@ -16,6 +16,42 @@ interface Topic {
   desc: string;
   icon: React.ReactNode;
   url: string;
+}
+
+// React Error Boundary to safely isolate Disqus's potential cross-origin iframe or browser shield restrictions
+class DisqusErrorBoundary extends React.Component<any, any> {
+  state: any;
+  props: any;
+
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+    this.props = props;
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.warn("Disqus script block or sandboxed container error handled gracefully:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-5 bg-amber-50/80 border border-amber-200/65 rounded-2xl text-center shadow-xs">
+          <p className="text-xs text-amber-950 font-sans font-semibold">
+            Interactive Discussion Shielded 🛡️
+          </p>
+          <p className="text-[10px] text-amber-800 font-sans mt-1 max-w-sm mx-auto leading-normal">
+            Your browser security settings, tracking prevention, or embedded iframe constraints are preventing Disqus comments from rendering directly. Open this arcade in a Direct Tab or allow third-party cookies to sign in and comment!
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export function TribeForum() {
@@ -61,6 +97,17 @@ export function TribeForum() {
   ];
 
   const [activeTopic, setActiveTopic] = useState<Topic>(topics[0]);
+  const [isDisqusReady, setIsDisqusReady] = useState(false);
+
+  // Lazy-load the Disqus iframe to maintain 60 FPS transitions.
+  // Slow scripts can block initial tab rendering, so we defer compilation and asset load.
+  useEffect(() => {
+    setIsDisqusReady(false);
+    const delayTimer = setTimeout(() => {
+      setIsDisqusReady(true);
+    }, 450); // Fluid tab animation buffer
+    return () => clearTimeout(delayTimer);
+  }, [activeTopic.id]);
 
   return (
     <div className="w-full flex flex-col gap-6 p-1 animate-fade-in">
@@ -153,16 +200,25 @@ export function TribeForum() {
             </p>
           </div>
 
-          <div className="disqus-container min-h-[300px]">
-            <DiscussionEmbed
-              shortname="tribes"
-              config={{
-                url: activeTopic.url,
-                identifier: activeTopic.id,
-                title: activeTopic.title,
-                language: 'zh_TW'
-              }}
-            />
+          <div className="disqus-container min-h-[300px] flex flex-col justify-center">
+            <DisqusErrorBoundary>
+              {isDisqusReady ? (
+                <DiscussionEmbed
+                  shortname="tribes"
+                  config={{
+                    url: activeTopic.url,
+                    identifier: activeTopic.id,
+                    title: activeTopic.title,
+                    language: 'zh_TW'
+                  }}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8 gap-3">
+                  <div className="w-8 h-8 rounded-full border-2 border-t-[#ff56a7] border-[#ff56a7]/20 animate-spin"></div>
+                  <p className="font-sans text-[11px] text-neutral-400">Synching thread stream...</p>
+                </div>
+              )}
+            </DisqusErrorBoundary>
           </div>
         </div>
       </div>
